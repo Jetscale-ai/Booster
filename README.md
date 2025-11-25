@@ -7,7 +7,7 @@
 
 ## Images
 
-We publish two families of images to GHCR (and optionally Docker Hub):
+We publish two families of images to GHCR and Docker Hub:
 
 ### 1. Dev Images (`-dev`)
 
