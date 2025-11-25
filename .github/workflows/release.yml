@@ -167,6 +167,10 @@ jobs:
             docker buildx build \
               --file "${{ inputs.dockerfile }}" \
               --target "booster-${lang_trimmed}-dev" \
+              --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+              --label "org.opencontainers.image.description=Booster ${lang_trimmed} development image" \
+              --label "org.opencontainers.image.licenses=MIT" \
+              --label "org.opencontainers.image.version=${VERSION}" \
               --push \
               --cache-from type=gha,scope=dev-${lang_trimmed} \
               --cache-to type=gha,mode=max,scope=dev-${lang_trimmed} \
@@ -186,6 +190,10 @@ jobs:
             docker buildx build \
               --file "${{ inputs.dockerfile }}" \
               --target "booster-${runtime_lang}" \
+              --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+              --label "org.opencontainers.image.description=Booster ${runtime_lang} runtime image" \
+              --label "org.opencontainers.image.licenses=MIT" \
+              --label "org.opencontainers.image.version=${VERSION}" \
               --push \
               --cache-from type=gha,scope=run-${runtime_lang} \
               --cache-to type=gha,mode=max,scope=run-${runtime_lang} \
@@ -209,6 +217,10 @@ jobs:
           docker buildx build \
             --file "${{ inputs.dockerfile }}" \
             --target "${IMAGE_NAME}-dev" \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.description=Booster polyglot development image" \
+            --label "org.opencontainers.image.licenses=MIT" \
+            --label "org.opencontainers.image.version=${VERSION}" \
             --push \
             --cache-from type=gha,scope=dev-polyglot \
             --cache-to type=gha,mode=max,scope=dev-polyglot \
@@ -228,6 +240,10 @@ jobs:
           docker buildx build \
             --file "${{ inputs.dockerfile }}" \
             --target "${IMAGE_NAME}" \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.description=Booster polyglot runtime image" \
+            --label "org.opencontainers.image.licenses=MIT" \
+            --label "org.opencontainers.image.version=${VERSION}" \
             --push \
             --cache-from type=gha,scope=run-polyglot \
             --cache-to type=gha,mode=max,scope=run-polyglot \
