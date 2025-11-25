@@ -1,0 +1,175 @@
+name: Reusable Release
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+        description: "Name of the image (e.g. booster, my-service)"
+      languages:
+        required: true
+        type: string
+        description: "Comma-separated list of languages (e.g. go,ts,py)"
+      dockerfile:
+        required: false
+        type: string
+        default: ./Dockerfile
+        description: "Path to Dockerfile"
+      test_command:
+        required: false
+        type: string
+        default: ""
+        description: "Command to run tests before release"
+      publish_to_dockerhub:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to publish to Docker Hub"
+
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install go-semantic-release
+        run: go install github.com/go-semantic-release/semantic-release/v2/cmd/semantic-release@latest
+
+      - name: Run Tests
+        if: inputs.test_command != ''
+        run: ${{ inputs.test_command }}
+
+      - name: Compute next version
+        id: semrel
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if we can compute a version
+          if ! semantic-release print-version --slug ${{ github.repository }} --nologo > version.txt; then
+            echo "No release necessary or error computing version."
+            echo "skipped=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          VERSION=$(cat version.txt)
+          echo "Computed version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "skipped=false" >> $GITHUB_OUTPUT
+
+      - name: Check Secrets
+        id: check_secrets
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -n "$DH_USER" ] && [ -n "$DH_TOKEN" ]; then
+            echo "has_dockerhub=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_dockerhub=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Login to GHCR
+        if: steps.semrel.outputs.skipped != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: steps.semrel.outputs.skipped != 'true' && inputs.publish_to_dockerhub && steps.check_secrets.outputs.has_dockerhub == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Setup Docker Buildx
+        if: steps.semrel.outputs.skipped != 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Images
+        if: steps.semrel.outputs.skipped != 'true'
+        env:
+          VERSION: ${{ steps.semrel.outputs.version }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          OWNER: ${{ github.repository_owner }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          HAS_DOCKERHUB: ${{ steps.check_secrets.outputs.has_dockerhub }}
+        run: |
+          # Lowercase owner for GHCR
+          OWNER_LC=$(echo "${OWNER}" | tr '[:upper:]' '[:lower:]')
+          IFS=',' read -ra LANGS <<< "${{ inputs.languages }}"
+          
+          for lang in "${LANGS[@]}"; do
+            lang_trimmed=$(echo "$lang" | xargs)
+            echo "Processing language: $lang_trimmed"
+            
+            # Tags for Dev Image
+            GHCR_DEV="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-${lang_trimmed}-dev"
+            TAGS_DEV="${GHCR_DEV}:${VERSION},${GHCR_DEV}:latest"
+            
+            if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
+               DH_DEV="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${lang_trimmed}-dev"
+               TAGS_DEV="${TAGS_DEV},${DH_DEV}:${VERSION},${DH_DEV}:latest"
+            fi
+            
+            echo "Building Dev Image: ${TAGS_DEV}"
+            docker buildx build \
+              --file "${{ inputs.dockerfile }}" \
+              --target "booster-${lang_trimmed}-dev" \
+              --push \
+              --cache-from type=gha,scope=dev-${lang_trimmed} \
+              --cache-to type=gha,mode=max,scope=dev-${lang_trimmed} \
+              $(echo "${TAGS_DEV}" | tr ',' '\n' | sed 's/^/--tag /') \
+              .
+
+            # Tags for Runtime Image
+            GHCR_RUN="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-${lang_trimmed}"
+            TAGS_RUN="${GHCR_RUN}:${VERSION},${GHCR_RUN}:latest"
+            
+            if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
+               DH_RUN="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${lang_trimmed}"
+               TAGS_RUN="${TAGS_RUN},${DH_RUN}:${VERSION},${DH_RUN}:latest"
+            fi
+
+            echo "Building Runtime Image: ${TAGS_RUN}"
+            docker buildx build \
+              --file "${{ inputs.dockerfile }}" \
+              --target "booster-${lang_trimmed}" \
+              --push \
+              --cache-from type=gha,scope=run-${lang_trimmed} \
+              --cache-to type=gha,mode=max,scope=run-${lang_trimmed} \
+              $(echo "${TAGS_RUN}" | tr ',' '\n' | sed 's/^/--tag /') \
+              .
+          done
+
+      - name: Create GitHub Release
+        if: steps.semrel.outputs.skipped != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          semantic-release publish --slug ${{ github.repository }}
+

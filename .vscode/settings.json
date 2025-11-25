@@ -1,0 +1,43 @@
+{
+  "cSpell.words": [
+    "jetscale"
+  ],
+  "cSpell.customDictionaries": {
+    "deposition": {
+      "name": "deposition",
+      "path": "~/.dotfiles/dictionaries/deposition.txt",
+      "scope": "workspace",
+      "addWords": true
+    },
+    "jetscale": {
+      "name": "jetscale",
+      "path": "~/.dotfiles/dictionaries/jetscale.txt",
+      "scope": "workspace",
+      "addWords": true
+    },
+    "personal": {
+      "name": "personal",
+      "path": "~/.dotfiles/dictionaries/personal.txt",
+      "scope": "workspace",
+      "addWords": true
+    },
+    "questionable": {
+      "name": "questionable",
+      "path": "~/.dotfiles/dictionaries/questionable.txt",
+      "scope": "workspace",
+      "addWords": true
+    },
+    "ubisoft": {
+      "name": "ubisoft",
+      "path": "~/.dotfiles/dictionaries/ubisoft.txt",
+      "scope": "workspace",
+      "addWords": true
+    },
+    "universal": {
+      "name": "universal",
+      "path": "~/.dotfiles/dictionaries/universal.txt",
+      "scope": "workspace",
+      "addWords": true
+    }
+  }
+}
