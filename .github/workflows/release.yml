@@ -53,7 +53,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.25"
 
       - name: Install go-semantic-release
         run: go install github.com/go-semantic-release/semantic-release/v2/cmd/semantic-release@latest
@@ -68,16 +68,36 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Check if we can compute a version
-          if ! semantic-release print-version --slug ${{ github.repository }} --nologo > version.txt; then
+          if ! semantic-release print-version --version-file version.txt > /dev/null; then
             echo "No release necessary or error computing version."
-            echo "skipped=true" >> $GITHUB_OUTPUT
-            exit 0
+            
+            # If running locally (ACT=true), force a version to test the pipeline
+            if [[ "${ACT:-}" == "true" ]]; then
+              echo "Running locally, forcing a test version."
+              echo "0.0.0-test" > version.txt
+            else
+              echo "skipped=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
           fi
           
           VERSION=$(cat version.txt)
           echo "Computed version: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "skipped=false" >> $GITHUB_OUTPUT
+
+      - name: Detect Local Run
+        id: local_check
+        run: |
+          if [[ "${ACT:-}" == "true" ]]; then
+            echo "is_local=true" >> "$GITHUB_OUTPUT"
+            echo "suffix=-local" >> "$GITHUB_OUTPUT"
+            echo "Running in local act environment - tags will be suffixed with -local"
+          else
+            echo "is_local=false" >> "$GITHUB_OUTPUT"
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+            echo "Running in GitHub Actions - using standard tags"
+          fi
 
       - name: Check Secrets
         id: check_secrets
@@ -118,6 +138,7 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           HAS_DOCKERHUB: ${{ steps.check_secrets.outputs.has_dockerhub }}
+          SUFFIX: ${{ steps.local_check.outputs.suffix }}
         run: |
           # Lowercase owner for GHCR
           OWNER_LC=$(echo "${OWNER}" | tr '[:upper:]' '[:lower:]')
@@ -127,13 +148,19 @@ jobs:
             lang_trimmed=$(echo "$lang" | xargs)
             echo "Processing language: $lang_trimmed"
             
+            # Map TS to JS for Runtime Image
+            runtime_lang="$lang_trimmed"
+            if [[ "$lang_trimmed" == "ts" ]]; then
+              runtime_lang="js"
+            fi
+
             # Tags for Dev Image
             GHCR_DEV="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-${lang_trimmed}-dev"
-            TAGS_DEV="${GHCR_DEV}:${VERSION},${GHCR_DEV}:latest"
+            TAGS_DEV="${GHCR_DEV}:${VERSION}${SUFFIX},${GHCR_DEV}:latest${SUFFIX}"
             
             if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
                DH_DEV="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${lang_trimmed}-dev"
-               TAGS_DEV="${TAGS_DEV},${DH_DEV}:${VERSION},${DH_DEV}:latest"
+               TAGS_DEV="${TAGS_DEV},${DH_DEV}:${VERSION}${SUFFIX},${DH_DEV}:latest${SUFFIX}"
             fi
             
             echo "Building Dev Image: ${TAGS_DEV}"
@@ -146,30 +173,71 @@ jobs:
               $(echo "${TAGS_DEV}" | tr ',' '\n' | sed 's/^/--tag /') \
               .
 
-            # Tags for Runtime Image
-            GHCR_RUN="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-${lang_trimmed}"
-            TAGS_RUN="${GHCR_RUN}:${VERSION},${GHCR_RUN}:latest"
+            # Tags for Runtime Image (using runtime_lang)
+            GHCR_RUN="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-${runtime_lang}"
+            TAGS_RUN="${GHCR_RUN}:${VERSION}${SUFFIX},${GHCR_RUN}:latest${SUFFIX}"
             
             if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
-               DH_RUN="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${lang_trimmed}"
-               TAGS_RUN="${TAGS_RUN},${DH_RUN}:${VERSION},${DH_RUN}:latest"
+               DH_RUN="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${runtime_lang}"
+               TAGS_RUN="${TAGS_RUN},${DH_RUN}:${VERSION}${SUFFIX},${DH_RUN}:latest${SUFFIX}"
             fi
 
             echo "Building Runtime Image: ${TAGS_RUN}"
             docker buildx build \
               --file "${{ inputs.dockerfile }}" \
-              --target "booster-${lang_trimmed}" \
+              --target "booster-${runtime_lang}" \
               --push \
-              --cache-from type=gha,scope=run-${lang_trimmed} \
-              --cache-to type=gha,mode=max,scope=run-${lang_trimmed} \
+              --cache-from type=gha,scope=run-${runtime_lang} \
+              --cache-to type=gha,mode=max,scope=run-${runtime_lang} \
               $(echo "${TAGS_RUN}" | tr ',' '\n' | sed 's/^/--tag /') \
               .
           done
 
+          # --- Build Polyglot Images (booster & booster-dev) ---
+          echo "Processing polyglot images..."
+          
+          # Dev Image (Polyglot)
+          GHCR_DEV_POLY="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-dev"
+          TAGS_DEV_POLY="${GHCR_DEV_POLY}:${VERSION}${SUFFIX},${GHCR_DEV_POLY}:latest${SUFFIX}"
+          
+          if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
+             DH_DEV_POLY="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-dev"
+             TAGS_DEV_POLY="${TAGS_DEV_POLY},${DH_DEV_POLY}:${VERSION}${SUFFIX},${DH_DEV_POLY}:latest${SUFFIX}"
+          fi
+          
+          echo "Building Polyglot Dev Image: ${TAGS_DEV_POLY}"
+          docker buildx build \
+            --file "${{ inputs.dockerfile }}" \
+            --target "${IMAGE_NAME}-dev" \
+            --push \
+            --cache-from type=gha,scope=dev-polyglot \
+            --cache-to type=gha,mode=max,scope=dev-polyglot \
+            $(echo "${TAGS_DEV_POLY}" | tr ',' '\n' | sed 's/^/--tag /') \
+            .
+
+          # Runtime Image (Polyglot)
+          GHCR_RUN_POLY="ghcr.io/${OWNER_LC}/${IMAGE_NAME}"
+          TAGS_RUN_POLY="${GHCR_RUN_POLY}:${VERSION}${SUFFIX},${GHCR_RUN_POLY}:latest${SUFFIX}"
+          
+          if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
+             DH_RUN_POLY="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}"
+             TAGS_RUN_POLY="${TAGS_RUN_POLY},${DH_RUN_POLY}:${VERSION}${SUFFIX},${DH_RUN_POLY}:latest${SUFFIX}"
+          fi
+          
+          echo "Building Polyglot Runtime Image: ${TAGS_RUN_POLY}"
+          docker buildx build \
+            --file "${{ inputs.dockerfile }}" \
+            --target "${IMAGE_NAME}" \
+            --push \
+            --cache-from type=gha,scope=run-polyglot \
+            --cache-to type=gha,mode=max,scope=run-polyglot \
+            $(echo "${TAGS_RUN_POLY}" | tr ',' '\n' | sed 's/^/--tag /') \
+            .
+
       - name: Create GitHub Release
-        if: steps.semrel.outputs.skipped != 'true'
+        if: steps.semrel.outputs.skipped != 'true' && steps.local_check.outputs.is_local != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          semantic-release publish --slug ${{ github.repository }}
+          semantic-release publish
 

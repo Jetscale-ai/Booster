@@ -1,110 +1,166 @@
 # ==========================================
-# Stage 1: Dev Base (Ubuntu 24.04)
+# 0. Global Setup
 # ==========================================
 FROM ubuntu:24.04 AS dev-base
-
 ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-c"]
-
-# Common tools for all dev images
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    git \
-    ca-certificates \
-    build-essential \
-    tini \
-    jq \
-    vim \
-    openssh-client \
-    gnupg \
+    curl git ca-certificates build-essential tini jq vim openssh-client gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# ==========================================
-# Language Specific Dev Layers
-# ==========================================
-
-# --- Go Dev ---
-FROM dev-base AS booster-go-dev
-ARG GO_VERSION=1.22.2
-RUN curl -L "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz
-ENV PATH="/usr/local/go/bin:${PATH}"
-# Verify
-RUN go version
-
-# --- TypeScript/Node Dev ---
-FROM dev-base AS booster-ts-dev
-ARG NODE_VERSION=20
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g pnpm \
-    && rm -rf /var/lib/apt/lists/*
-# Verify
-RUN node -v && pnpm -v
-
-# --- Python Dev ---
-FROM dev-base AS booster-py-dev
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-pip \
-    python3-venv \
-    && rm -rf /var/lib/apt/lists/*
-# Install poetry
-RUN curl -sSL https://install.python-poetry.org | python3 -
-ENV PATH="/root/.local/bin:${PATH}"
-# Verify
-RUN python3 --version && poetry --version
-
-# --- Polyglot Dev (All-in-one) ---
-FROM dev-base AS booster-dev
-# Install Go
-COPY --from=booster-go-dev /usr/local/go /usr/local/go
-ENV PATH="/usr/local/go/bin:${PATH}"
-# Install Node/pnpm (re-running script here or copying artifacts is tricky with apt, easier to re-run setup for stability)
-ARG NODE_VERSION=20
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g pnpm
-# Install Python/Poetry
-RUN apt-get install -y --no-install-recommends python3 python3-pip python3-venv
-COPY --from=booster-py-dev /root/.local /root/.local
-ENV PATH="/root/.local/bin:${PATH}"
-RUN rm -rf /var/lib/apt/lists/*
-
-# ==========================================
-# Stage 2: Runtime Base (Alpine)
-# ==========================================
 FROM alpine:3.20 AS runtime-base
-
-RUN apk add --no-cache \
-    ca-certificates \
-    tini \
-    bash
-
+RUN apk add --no-cache ca-certificates tini bash
 ENTRYPOINT ["/sbin/tini", "--"]
 
+# Test Assets (Source Code)
+FROM dev-base AS assets
+COPY test /test
+
 # ==========================================
-# Language Specific Runtime Layers
+# 1. Base Toolchains (Clean)
 # ==========================================
 
-# --- Go Runtime ---
-FROM runtime-base AS booster-go
-# Go binaries are usually static, but libc compat might be needed
+# --- Go Base ---
+FROM dev-base AS base-dev-go
+ARG GO_VERSION=1.25.4
+RUN curl -L "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+# --- TS Base ---
+FROM dev-base AS base-dev-ts
+ARG NODE_VERSION=20
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g pnpm ts-node typescript \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Py Base ---
+FROM dev-base AS base-dev-py
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -sSL https://install.python-poetry.org | python3 -
+ENV PATH="/root/.local/bin:${PATH}"
+
+# --- Polyglot Base ---
+FROM dev-base AS base-dev-poly
+COPY --from=base-dev-go /usr/local/go /usr/local/go
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+# Install Node.js (Native)
+ARG NODE_VERSION=20
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
+    && apt-get install -y nodejs
+
+# Copy Global NPM Tools (pnpm, ts-node, typescript)
+COPY --from=base-dev-ts /usr/local/bin /usr/local/bin
+COPY --from=base-dev-ts /usr/lib/node_modules /usr/lib/node_modules
+
+COPY --from=base-dev-py /root/.local /root/.local
+ENV PATH="/root/.local/bin:${PATH}"
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv
+
+# ==========================================
+# 2. DEV VERIFICATION (Logic Tests + Artifact Prep)
+# ==========================================
+# Here we run the "Heavy" tests (Unit Tests) and build the "Light" tests (Smoke Artifacts).
+
+# --- Go Logic Check ---
+FROM base-dev-go AS test-dev-go
+COPY --from=assets /test/go /tmp/test-go
+# A. Run Logic/Unit Tests (Requires Toolchain)
+RUN cd /tmp/test-go && go run main.go
+# B. Build Standalone Smoke Binary (For Runtime Check)
+#    This binary relies solely on libc, no other dependencies.
+RUN cd /tmp/test-go && go build -o /tmp/artifacts/smoke-go main.go
+RUN touch /tmp/PASSED
+
+# --- TS Logic Check ---
+FROM base-dev-ts AS test-dev-ts
+COPY --from=assets /test/ts /tmp/test-ts
+# A. Run Logic/Unit Tests (Requires ts-node/DevDeps)
+RUN cd /tmp/test-ts && ts-node index.ts
+# B. Transpile to Standalone JS (For Runtime Check)
+#    This script relies solely on standard node libs.
+RUN mkdir -p /tmp/artifacts && \
+    cd /tmp/test-ts && tsc index.ts --outfile /tmp/artifacts/smoke-ts.js
+RUN touch /tmp/PASSED
+
+# --- Py Logic Check ---
+FROM base-dev-py AS test-dev-py
+COPY --from=assets /test/py /tmp/test-py
+# A. Run Logic Tests
+RUN cd /tmp/test-py && python3 main.py
+# B. Prepare Smoke Script (For Runtime Check)
+RUN mkdir -p /tmp/artifacts && cp /tmp/test-py/main.py /tmp/artifacts/smoke-py.py
+RUN touch /tmp/PASSED
+
+# --- Polyglot Integration Check ---
+FROM base-dev-poly AS test-dev-poly
+WORKDIR /app
+# Gather Smoke Artifacts
+COPY --from=test-dev-go /tmp/artifacts/smoke-go .
+COPY --from=test-dev-ts /tmp/artifacts/smoke-ts.js .
+COPY --from=test-dev-py /tmp/artifacts/smoke-py.py .
+COPY --from=assets /test/verify_polyglot.sh .
+# Update script to look for "smoke-*" instead of "app-*"
+RUN sed -i 's/app-/smoke-/g' verify_polyglot.sh
+# Run Integration Check
+RUN chmod +x verify_polyglot.sh && ./verify_polyglot.sh
+RUN touch /tmp/PASSED
+
+# ==========================================
+# 3. Final Release Images
+# ==========================================
+
+# --- DEV IMAGES ---
+# Depend on Dev Tests passing.
+FROM base-dev-go AS booster-go-dev
+COPY --from=test-dev-go /tmp/PASSED /dev/null
+
+FROM base-dev-ts AS booster-ts-dev
+COPY --from=test-dev-ts /tmp/PASSED /dev/null
+
+FROM base-dev-py AS booster-py-dev
+COPY --from=test-dev-py /tmp/PASSED /dev/null
+
+FROM base-dev-poly AS booster-dev
+COPY --from=test-dev-poly /tmp/PASSED /dev/null
+
+# --- RUNTIME IMAGES ---
+# Depend on Runtime Capability Checks (Smoke Tests).
+# We mount the artifacts. If they run, the image is good.
+# We DO NOT install any dev dependencies.
+
+FROM runtime-base AS base-run-go
 RUN apk add --no-cache libc6-compat
 
-# --- TypeScript/Node Runtime ---
-FROM runtime-base AS booster-ts
+FROM runtime-base AS base-run-js
 RUN apk add --no-cache nodejs npm
 
-# --- Python Runtime ---
-FROM runtime-base AS booster-py
+FROM runtime-base AS base-run-py
 RUN apk add --no-cache python3
 
-# --- Polyglot Runtime ---
-# (Rarely used, but provided for symmetry)
-FROM runtime-base AS booster
-RUN apk add --no-cache \
-    libc6-compat \
-    nodejs \
-    npm \
-    python3
+FROM runtime-base AS base-run-poly
+RUN apk add --no-cache libc6-compat nodejs npm python3
 
+# RELEASE TARGETS
+# The RUN --mount instructions act as the verification step.
+# If these commands fail, the build fails.
+# If they succeed, the artifacts vanish, leaving a clean image.
+
+FROM base-run-go AS booster-go
+RUN --mount=from=test-dev-go,source=/tmp/artifacts/smoke-go,target=/tmp/check \
+    /tmp/check
+
+FROM base-run-js AS booster-js
+RUN --mount=from=test-dev-ts,source=/tmp/artifacts/smoke-ts.js,target=/tmp/check.js \
+    node /tmp/check.js
+
+FROM base-run-py AS booster-py
+RUN --mount=from=test-dev-py,source=/tmp/artifacts/smoke-py.py,target=/tmp/check.py \
+    python3 /tmp/check.py
+
+FROM base-run-poly AS booster
+RUN --mount=from=test-dev-poly,source=/app,target=/tmp/tests \
+    cd /tmp/tests && ./verify_polyglot.sh
