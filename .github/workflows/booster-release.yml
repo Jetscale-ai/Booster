@@ -18,7 +18,5 @@ jobs:
       dockerfile: ./Dockerfile
       publish_to_dockerhub: true
       test_command: "go test -v ./..."
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-      JETSCALEBOT_GITHUB_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN }}
+    secrets: inherit
+

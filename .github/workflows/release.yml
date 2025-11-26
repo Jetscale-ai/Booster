@@ -23,7 +23,7 @@ on:
       publish_to_dockerhub:
         required: false
         type: boolean
-        default: true
+        default: false
       registry_username:
         required: false
         type: string
