@@ -70,7 +70,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN != '' && secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           # Check if we can compute a version without publishing yet
-          if ! semantic-release --dry --no-ci --allow-no-changes --version-file version.txt > /dev/null; then
+          if ! semantic-release --dry --no-ci --allow-no-changes --update version.txt --version-file version.txt > /dev/null; then
             echo "No release necessary or error computing version."
             
             # If running locally (ACT=true), force a version to test the pipeline
