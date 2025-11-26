@@ -6,31 +6,28 @@ on:
       image_name:
         required: true
         type: string
-        description: "Name of the image (e.g. booster, my-service)"
+        description: "Name of the image (e.g. booster, thruster)"
       languages:
-        required: true
+        required: false
         type: string
-        description: "Comma-separated list of languages (e.g. go,ts,py)"
+        default: ""
+        description: "Comma-separated list of languages (e.g. go,ts). Leave empty for Base/Single images."
       dockerfile:
         required: false
         type: string
         default: ./Dockerfile
-        description: "Path to Dockerfile"
       test_command:
         required: false
         type: string
         default: ""
-        description: "Command to run tests before release"
       publish_to_dockerhub:
         required: false
         type: boolean
         default: true
-        description: "Whether to publish to Docker Hub"
       registry_username:
         required: false
         type: string
         default: ""
-        description: "Username for GHCR login (defaults to github.actor if empty)"
 
     secrets:
       DOCKERHUB_USERNAME:
@@ -72,11 +69,9 @@ jobs:
           if [[ "${ACT:-}" == "true" ]]; then
             echo "is_local=true" >> "$GITHUB_OUTPUT"
             echo "suffix=-local" >> "$GITHUB_OUTPUT"
-            echo "Running in local act environment - tags will be suffixed with -local"
           else
             echo "is_local=false" >> "$GITHUB_OUTPUT"
             echo "suffix=" >> "$GITHUB_OUTPUT"
-            echo "Running in GitHub Actions - using standard tags"
           fi
 
       - name: Semantic Release
@@ -97,20 +92,12 @@ jobs:
         env:
           DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          JB_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN }}
         run: |
           if [ -n "$DH_USER" ] && [ -n "$DH_TOKEN" ]; then
             echo "has_dockerhub=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_dockerhub=false" >> "$GITHUB_OUTPUT"
           fi
-          
-          if [ -n "$JB_TOKEN" ]; then
-            echo "JETSCALEBOT_GITHUB_TOKEN is set (length: ${#JB_TOKEN})"
-          else
-            echo "JETSCALEBOT_GITHUB_TOKEN is NOT set"
-          fi
-          echo "Current Actor: $GITHUB_ACTOR"
 
       - name: Login to GHCR
         if: steps.semrel.outputs.version != '' || steps.local_check.outputs.is_local == 'true'
@@ -141,112 +128,128 @@ jobs:
           HAS_DOCKERHUB: ${{ steps.check_secrets.outputs.has_dockerhub }}
           SUFFIX: ${{ steps.local_check.outputs.suffix }}
         run: |
-          # Lowercase owner for GHCR
           OWNER_LC=$(echo "${OWNER}" | tr '[:upper:]' '[:lower:]')
-          IFS=',' read -ra LANGS <<< "${{ inputs.languages }}"
+          SHA_SHORT=$(git rev-parse --short HEAD)
+
+          # --- Helper: Generate Strict Tags ---
+          # Output: comma-separated tags including :latest, :vX.Y.Z, :vX.Y, :vX, :sha-XXXX
+          generate_tags() {
+            local image_ghcr="$1"
+            local image_dh="$2"
+            local tags=""
+            
+            # Base Tags: Version + Latest + SHA
+            local t_ghcr="${image_ghcr}:${VERSION}${SUFFIX},${image_ghcr}:latest${SUFFIX},${image_ghcr}:sha-${SHA_SHORT}${SUFFIX}"
+            local t_dh=""
+            if [[ -n "$image_dh" ]]; then
+              t_dh="${image_dh}:${VERSION}${SUFFIX},${image_dh}:latest${SUFFIX},${image_dh}:sha-${SHA_SHORT}${SUFFIX}"
+            fi
+
+            # Semantic Aliases (only if not local suffix and version is strict semver)
+            if [[ -z "$SUFFIX" && "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              local major=$(echo "$VERSION" | cut -d. -f1)
+              local minor=$(echo "$VERSION" | cut -d. -f1,2)
+              
+              t_ghcr="${t_ghcr},${image_ghcr}:${major},${image_ghcr}:${minor}"
+              if [[ -n "$image_dh" ]]; then
+                t_dh="${t_dh},${image_dh}:${major},${image_dh}:${minor}"
+              fi
+            fi
+
+            if [[ -n "$t_dh" ]]; then
+              echo "${t_ghcr},${t_dh}"
+            else
+              echo "${t_ghcr}"
+            fi
+          }
+
+          # --- 1. Language Variants Loop ---
+          if [[ -n "${{ inputs.languages }}" ]]; then
+            IFS=',' read -ra LANGS <<< "${{ inputs.languages }}"
+            for lang in "${LANGS[@]}"; do
+              lang_trimmed=$(echo "$lang" | xargs)
+              echo "Processing language: $lang_trimmed"
+              
+              runtime_lang="$lang_trimmed"
+              if [[ "$lang_trimmed" == "ts" ]]; then runtime_lang="js"; fi
+
+              # DEV Image
+              GHCR_DEV="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-${lang_trimmed}-dev"
+              DH_DEV=""
+              if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
+                 DH_DEV="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${lang_trimmed}-dev"
+              fi
+              TAGS_DEV=$(generate_tags "$GHCR_DEV" "$DH_DEV")
+              
+              echo "Building Dev ($lang): ${TAGS_DEV}"
+              docker buildx build \
+                --file "${{ inputs.dockerfile }}" \
+                --target "${IMAGE_NAME}-${lang_trimmed}-dev" \
+                --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+                --label "org.opencontainers.image.version=${VERSION}" \
+                --push \
+                --cache-from type=gha,scope=dev-${lang_trimmed} \
+                --cache-to type=gha,mode=max,scope=dev-${lang_trimmed} \
+                $(echo "${TAGS_DEV}" | tr ',' '\n' | sed 's/^/--tag /') .
+
+              # RUNTIME Image
+              GHCR_RUN="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-${runtime_lang}"
+              DH_RUN=""
+              if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
+                 DH_RUN="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${runtime_lang}"
+              fi
+              TAGS_RUN=$(generate_tags "$GHCR_RUN" "$DH_RUN")
+
+              echo "Building Runtime ($lang): ${TAGS_RUN}"
+              docker buildx build \
+                --file "${{ inputs.dockerfile }}" \
+                --target "${IMAGE_NAME}-${runtime_lang}" \
+                --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+                --label "org.opencontainers.image.version=${VERSION}" \
+                --push \
+                --cache-from type=gha,scope=run-${runtime_lang} \
+                --cache-to type=gha,mode=max,scope=run-${runtime_lang} \
+                $(echo "${TAGS_RUN}" | tr ',' '\n' | sed 's/^/--tag /') .
+            done
+          fi
+
+          # --- 2. Base/Polyglot Images (Runs for everyone) ---
+          echo "Processing Base/Polyglot images..."
           
-          for lang in "${LANGS[@]}"; do
-            lang_trimmed=$(echo "$lang" | xargs)
-            echo "Processing language: $lang_trimmed"
-            
-            # Map TS to JS for Runtime Image
-            runtime_lang="$lang_trimmed"
-            if [[ "$lang_trimmed" == "ts" ]]; then
-              runtime_lang="js"
-            fi
-
-            # Tags for Dev Image
-            GHCR_DEV="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-${lang_trimmed}-dev"
-            TAGS_DEV="${GHCR_DEV}:${VERSION}${SUFFIX},${GHCR_DEV}:latest${SUFFIX}"
-            
-            if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
-               DH_DEV="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${lang_trimmed}-dev"
-               TAGS_DEV="${TAGS_DEV},${DH_DEV}:${VERSION}${SUFFIX},${DH_DEV}:latest${SUFFIX}"
-            fi
-            
-            echo "Building Dev Image: ${TAGS_DEV}"
-            docker buildx build \
-              --file "${{ inputs.dockerfile }}" \
-              --target "booster-${lang_trimmed}-dev" \
-              --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-              --label "org.opencontainers.image.description=Booster ${lang_trimmed} development image" \
-              --label "org.opencontainers.image.licenses=MIT" \
-              --label "org.opencontainers.image.version=${VERSION}" \
-              --push \
-              --cache-from type=gha,scope=dev-${lang_trimmed} \
-              --cache-to type=gha,mode=max,scope=dev-${lang_trimmed} \
-              $(echo "${TAGS_DEV}" | tr ',' '\n' | sed 's/^/--tag /') \
-              .
-
-            # Tags for Runtime Image (using runtime_lang)
-            GHCR_RUN="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-${runtime_lang}"
-            TAGS_RUN="${GHCR_RUN}:${VERSION}${SUFFIX},${GHCR_RUN}:latest${SUFFIX}"
-            
-            if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
-               DH_RUN="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${runtime_lang}"
-               TAGS_RUN="${TAGS_RUN},${DH_RUN}:${VERSION}${SUFFIX},${DH_RUN}:latest${SUFFIX}"
-            fi
-
-            echo "Building Runtime Image: ${TAGS_RUN}"
-            docker buildx build \
-              --file "${{ inputs.dockerfile }}" \
-              --target "booster-${runtime_lang}" \
-              --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-              --label "org.opencontainers.image.description=Booster ${runtime_lang} runtime image" \
-              --label "org.opencontainers.image.licenses=MIT" \
-              --label "org.opencontainers.image.version=${VERSION}" \
-              --push \
-              --cache-from type=gha,scope=run-${runtime_lang} \
-              --cache-to type=gha,mode=max,scope=run-${runtime_lang} \
-              $(echo "${TAGS_RUN}" | tr ',' '\n' | sed 's/^/--tag /') \
-              .
-          done
-
-          # --- Build Polyglot Images (booster & booster-dev) ---
-          echo "Processing polyglot images..."
-          
-          # Dev Image (Polyglot)
+          # DEV Image
           GHCR_DEV_POLY="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-dev"
-          TAGS_DEV_POLY="${GHCR_DEV_POLY}:${VERSION}${SUFFIX},${GHCR_DEV_POLY}:latest${SUFFIX}"
-          
+          DH_DEV_POLY=""
           if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
              DH_DEV_POLY="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-dev"
-             TAGS_DEV_POLY="${TAGS_DEV_POLY},${DH_DEV_POLY}:${VERSION}${SUFFIX},${DH_DEV_POLY}:latest${SUFFIX}"
           fi
+          TAGS_DEV_POLY=$(generate_tags "$GHCR_DEV_POLY" "$DH_DEV_POLY")
           
-          echo "Building Polyglot Dev Image: ${TAGS_DEV_POLY}"
+          echo "Building Base/Polyglot Dev: ${TAGS_DEV_POLY}"
           docker buildx build \
             --file "${{ inputs.dockerfile }}" \
             --target "${IMAGE_NAME}-dev" \
             --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-            --label "org.opencontainers.image.description=Booster polyglot development image" \
-            --label "org.opencontainers.image.licenses=MIT" \
             --label "org.opencontainers.image.version=${VERSION}" \
             --push \
             --cache-from type=gha,scope=dev-polyglot \
             --cache-to type=gha,mode=max,scope=dev-polyglot \
-            $(echo "${TAGS_DEV_POLY}" | tr ',' '\n' | sed 's/^/--tag /') \
-            .
+            $(echo "${TAGS_DEV_POLY}" | tr ',' '\n' | sed 's/^/--tag /') .
 
-          # Runtime Image (Polyglot)
+          # RUNTIME Image
           GHCR_RUN_POLY="ghcr.io/${OWNER_LC}/${IMAGE_NAME}"
-          TAGS_RUN_POLY="${GHCR_RUN_POLY}:${VERSION}${SUFFIX},${GHCR_RUN_POLY}:latest${SUFFIX}"
-          
+          DH_RUN_POLY=""
           if [[ "${{ inputs.publish_to_dockerhub }}" == "true" && "$HAS_DOCKERHUB" == "true" ]]; then
              DH_RUN_POLY="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}"
-             TAGS_RUN_POLY="${TAGS_RUN_POLY},${DH_RUN_POLY}:${VERSION}${SUFFIX},${DH_RUN_POLY}:latest${SUFFIX}"
           fi
+          TAGS_RUN_POLY=$(generate_tags "$GHCR_RUN_POLY" "$DH_RUN_POLY")
           
-          echo "Building Polyglot Runtime Image: ${TAGS_RUN_POLY}"
+          echo "Building Base/Polyglot Runtime: ${TAGS_RUN_POLY}"
           docker buildx build \
             --file "${{ inputs.dockerfile }}" \
             --target "${IMAGE_NAME}" \
             --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-            --label "org.opencontainers.image.description=Booster polyglot runtime image" \
-            --label "org.opencontainers.image.licenses=MIT" \
             --label "org.opencontainers.image.version=${VERSION}" \
             --push \
             --cache-from type=gha,scope=run-polyglot \
             --cache-to type=gha,mode=max,scope=run-polyglot \
-            $(echo "${TAGS_RUN_POLY}" | tr ',' '\n' | sed 's/^/--tag /') \
-            .
+            $(echo "${TAGS_RUN_POLY}" | tr ',' '\n' | sed 's/^/--tag /') .
