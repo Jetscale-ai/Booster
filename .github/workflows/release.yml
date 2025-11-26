@@ -74,27 +74,44 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN != '' && secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          # Check if we can compute a version without publishing yet
-          # REMOVED --allow-no-changes to ensure we properly skip if no release is needed
-          if ! semantic-release next --no-ci --version-file > /dev/null; then
-            echo "No release necessary or error computing version."
-            
-            # If running locally (ACT=true), force a version to test the pipeline
-            if [[ "${ACT:-}" == "true" ]]; then
-              echo "Running locally, forcing a test version."
-              echo "0.0.0-test" > version.txt
-            else
-              echo "skipped=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
+          echo "Computing next version..."
+          
+          # Temporarily disable 'exit on error' to capture the return code manually
+          set +e
+          # strictly remove --allow-no-changes
+          semantic-release next --no-ci --version-file > /dev/null
+          RC=$?
+          set -e
+          
+          if [ $RC -eq 65 ]; then
+             echo "✅ No relevant changes detected (Exit Code 65). Skipping release."
+             
+             # If running locally (ACT=true), force a version to test the pipeline
+             if [[ "${ACT:-}" == "true" ]]; then
+               echo "Running locally, forcing a test version."
+               echo "0.0.0-test" > version.txt
+               RC=0 # Fake success for local testing
+             else
+               echo "skipped=true" >> $GITHUB_OUTPUT
+               exit 0
+             fi
+          elif [ $RC -ne 0 ]; then
+             echo "❌ Error computing version (Exit Code $RC). Check logs."
+             exit $RC
           fi
           
           if [[ ! -f ".version" ]]; then
-            echo "semantic-release next did not produce .version file"
-            exit 1
+            # If explicit version file missing but RC=0 (local test or weird state), handle gracefully
+            if [[ -f "version.txt" ]]; then
+               # we are good, local test created it
+               :
+            else
+               echo "semantic-release next reported success but .version file is missing"
+               exit 1
+            fi
+          else
+            mv .version version.txt
           fi
-          
-          mv .version version.txt
           
           VERSION=$(cat version.txt)
           echo "Computed version: $VERSION"
