@@ -11,23 +11,25 @@ We publish two families of images to GHCR and Docker Hub:
 
 ### 1. Dev Images (`-dev`)
 
-Based on **Ubuntu 24.04**. Includes build tools (curl, git, build-essential) and language toolchains.
+Based on **[JetScale Thruster Dev](https://github.com/jetscale-ai/thruster)** (Ubuntu 24.04).
+Includes build tools (`curl`, `git`, `make`, `jq`, `yq`, `build-essential`) and language toolchains.
 Intended for: **CI Build Jobs**, **DevContainers**, **Local Development**.
 
-- `ghcr.io/jetscale/booster-dev` (Polyglot)
-- `ghcr.io/jetscale/booster-go-dev`
-- `ghcr.io/jetscale/booster-ts-dev`
-- `ghcr.io/jetscale/booster-py-dev`
+- `ghcr.io/jetscale-ai/booster-dev` (Polyglot)
+- `ghcr.io/jetscale-ai/booster-go-dev`
+- `ghcr.io/jetscale-ai/booster-ts-dev`
+- `ghcr.io/jetscale-ai/booster-py-dev`
 
 ### 2. Runtime Images (no suffix)
 
-Based on **Alpine 3.20**. Minimal footprint.
+Based on **[JetScale Thruster](https://github.com/jetscale-ai/thruster)** (Alpine 3.20).
+Minimal footprint, hardened.
 Intended for: **Production Containers**.
 
-- `ghcr.io/jetscale/booster`
-- `ghcr.io/jetscale/booster-go`
-- `ghcr.io/jetscale/booster-ts`
-- `ghcr.io/jetscale/booster-py`
+- `ghcr.io/jetscale-ai/booster`
+- `ghcr.io/jetscale-ai/booster-go`
+- `ghcr.io/jetscale-ai/booster-ts`
+- `ghcr.io/jetscale-ai/booster-py`
 
 ## The Golden Path: Reusable CI/CD
 
@@ -42,7 +44,7 @@ on:
 
 jobs:
   release:
-    uses: jetscale/booster/.github/workflows/release.yml@main
+    uses: jetscale-ai/booster/.github/workflows/release.yml@main
     with:
       image_name: my-service-name
       languages: 'go' # or "ts", "py", "go,ts"

@@ -1,16 +1,18 @@
 # ==========================================
 # 0. Global Setup
 # ==========================================
-FROM ubuntu:24.04 AS dev-base
-ENV DEBIAN_FRONTEND=noninteractive
-SHELL ["/bin/bash", "-c"]
+# USES: JetScale Thruster (Ubuntu 24.04 + Base Tools)
+FROM ghcr.io/jetscale-ai/thruster-dev:latest AS dev-base
+
+# Add build-essential (GCC/G++) which is not in Thruster (only 'make' is)
+# but often needed for specific language extensions.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git ca-certificates build-essential tini jq vim openssh-client gnupg \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-FROM alpine:3.20 AS runtime-base
-RUN apk add --no-cache ca-certificates tini bash
-ENTRYPOINT ["/sbin/tini", "--"]
+# USES: JetScale Thruster (Alpine 3.20 + Hardened Runtime)
+# Inherits: tini, ca-certificates, tzdata, bash, curl
+FROM ghcr.io/jetscale-ai/thruster:latest AS runtime-base
 
 # Test Assets (Source Code)
 FROM dev-base AS assets
