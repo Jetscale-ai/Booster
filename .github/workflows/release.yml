@@ -32,6 +32,8 @@ on:
         required: false
       DOCKERHUB_TOKEN:
         required: false
+      JETSCALEBOT_GITHUB_TOKEN:
+        required: false
 
 permissions:
   contents: write
@@ -65,7 +67,7 @@ jobs:
       - name: Compute next version
         id: semrel
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN != '' && secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           # Check if we can compute a version
           if ! semantic-release print-version --version-file version.txt > /dev/null; then
@@ -253,7 +255,7 @@ jobs:
       - name: Create GitHub Release
         if: steps.semrel.outputs.skipped != 'true' && steps.local_check.outputs.is_local != 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN != '' && secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           semantic-release publish
 

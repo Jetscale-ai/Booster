@@ -53,8 +53,9 @@ jobs:
 
 1. Ensure your repo has a valid `Dockerfile`.
    - If using `languages: "go"`, your Dockerfile must have targets `booster-go-dev` and `booster-go` (or rely on the default behavior if you don't need multi-stage splitting in the standard way, though the workflow currently targets specific stages).
-2. Ensure `GITHUB_TOKEN` has write access to packages (for GHCR).
-3. (Optional) Set `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in repository secrets to publish to Docker Hub.
+2. Create a repo (or org) secret named `JETSCALEBOT_GITHUB_TOKEN` containing a PAT with `repo`, `read:packages`, `write:packages`, and `workflow` scopes so `go-semantic-release` can create releases.
+3. Ensure the default `GITHUB_TOKEN` retains write access to packages (for GHCR).
+4. (Optional) Set `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` in repository secrets to publish to Docker Hub.
 
 ## Development
 
