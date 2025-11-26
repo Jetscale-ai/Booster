@@ -4,7 +4,7 @@ This is the **Constitution** for all AI agents and human contributors working on
 
 ## 1. Ethos (Character & Being)
 
-1. **Legitimacy (GitHub-Native):** We reject the "Rube Goldberg" complexity of our past GitLab DinD/TLS setups. All solutions must use **native GitHub Actions paradigms** (DooD, `workflow_call`, `GITHUB_OUTPUT`). We do not port legacy scripts; we reimplement intent using modern primitives.
+1. **Legitimacy (GitHub-Native):** All solutions must use **native GitHub Actions paradigms** (DooD, `workflow_call`, `GITHUB_OUTPUT`). We do not port legacy scripts; we reimplement intent using modern primitives.
 2. **Identity (The Booster Metaphor):** We build "Boosters"—heavy lift vehicles (images/workflows) that get other projects into orbit. We are infrastructure, not the payload. We must be reliable, reusable, and robust.
 3. **Purpose (Frictionless Release):** Our sole purpose is to allow a developer to drop 10 lines of YAML into their repo and achieve a perfect, secure, multi-arch release pipeline.
 4. **Aisthesis (The Aesthetic of Logs):** CI logs are our user interface. We ensure `go-semantic-release` and `docker` outputs are clean, grouped, and debuggable. We do not pollute the console with raw secrets or unformatted JSON.

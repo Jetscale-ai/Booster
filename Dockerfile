@@ -141,7 +141,39 @@ FROM runtime-base AS base-run-js
 RUN apk add --no-cache nodejs npm
 
 FROM runtime-base AS base-run-py
-RUN apk add --no-cache python3
+ARG PLAYWRIGHT_VERSION=1.48.0
+ENV VIRTUAL_ENV=/opt/venv
+RUN apk add --no-cache \
+        python3 \
+        py3-pip \
+        py3-virtualenv \
+        git \
+        curl \
+        unzip \
+        nodejs \
+        npm \
+        chromium \
+        chromium-chromedriver \
+        nss \
+        freetype \
+        ttf-freefont \
+        harfbuzz \
+        libstdc++ \
+    && python3 -m venv "${VIRTUAL_ENV}" \
+    && "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir --upgrade pip setuptools wheel \
+    && "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir "git+https://github.com/microsoft/playwright-python.git@v${PLAYWRIGHT_VERSION}" \
+    && SITE_PACKAGES="$("${VIRTUAL_ENV}/bin/python3" -c 'import site; print(site.getsitepackages()[0])')" \
+    && DRIVER_DIR="${SITE_PACKAGES}/playwright/driver" \
+    && mkdir -p "${DRIVER_DIR}" \
+    && curl -fsSL "https://playwright.azureedge.net/builds/driver/playwright-${PLAYWRIGHT_VERSION}-linux.zip" -o /tmp/playwright-driver.zip \
+    && unzip -q /tmp/playwright-driver.zip -d /tmp/playwright-driver \
+    && cp /tmp/playwright-driver/LICENSE "${DRIVER_DIR}/LICENSE" \
+    && if [ -f /tmp/playwright-driver/README.md ]; then cp /tmp/playwright-driver/README.md "${DRIVER_DIR}/README.md"; fi \
+    && cp -R /tmp/playwright-driver/package "${DRIVER_DIR}/" \
+    && rm -rf /tmp/playwright-driver /tmp/playwright-driver.zip \
+    && PLAYWRIGHT_NODEJS_PATH=/usr/bin/node "${VIRTUAL_ENV}/bin/playwright" install chromium
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+ENV PLAYWRIGHT_NODEJS_PATH=/usr/bin/node
 
 FROM runtime-base AS base-run-poly
 RUN apk add --no-cache libc6-compat nodejs npm python3
