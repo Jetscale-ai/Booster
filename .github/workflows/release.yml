@@ -113,12 +113,20 @@ jobs:
         env:
           DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          JB_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN }}
         run: |
           if [ -n "$DH_USER" ] && [ -n "$DH_TOKEN" ]; then
             echo "has_dockerhub=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_dockerhub=false" >> "$GITHUB_OUTPUT"
           fi
+          
+          if [ -n "$JB_TOKEN" ]; then
+            echo "JETSCALEBOT_GITHUB_TOKEN is set (length: ${#JB_TOKEN})"
+          else
+            echo "JETSCALEBOT_GITHUB_TOKEN is NOT set"
+          fi
+          echo "Current Actor: $GITHUB_ACTOR"
 
       - name: Login to GHCR
         if: steps.semrel.outputs.skipped != 'true'
