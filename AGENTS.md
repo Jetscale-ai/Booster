@@ -1,6 +1,6 @@
 # The Eudaimonia Framework: Booster Protocol
 
-This document defines the **Constitution** for all AI agents and human contributors working on the `booster` repository.
+This is the **Constitution** for all AI agents and human contributors working on the `booster` repository.
 
 ## 1. Ethos (Character & Being)
 
