@@ -3,6 +3,7 @@
   "image": "ghcr.io/jetscale-ai/booster-dev:latest",
   "features": {
     // Enable Docker-from-Docker to allow building the Booster images themselves
+    // and running 'gh act' (which needs the docker socket)
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
       "version": "latest",
       "enableNonRootDocker": "true",
@@ -20,6 +21,7 @@
       ]
     }
   },
-  // Mount the repo and run as root (default for raw Ubuntu images)
+  // Mount the repo and run as root (default for raw Ubuntu/Thruster images)
+  // This avoids permission issues when binding the host docker socket.
   "remoteUser": "root"
 }

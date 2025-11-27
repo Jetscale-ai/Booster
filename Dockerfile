@@ -49,7 +49,7 @@ ENV PATH="/root/.local/bin:${PATH}"
 # --- Polyglot Base ---
 FROM dev-base AS base-dev-poly
 
-# 1. Inherit Go Toolchain & Tools (Mage, Kind)
+# 1. Inherit Go Toolchain & Tools (Mage)
 COPY --from=base-dev-go /usr/local/go /usr/local/go
 COPY --from=base-dev-go /root/go/bin /root/go/bin
 ENV PATH="/usr/local/go/bin:/root/go/bin:${PATH}"
@@ -68,7 +68,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 python3
 
 # ==========================================
 # 4. PLATFORM ORCHESTRATION TOOLS
-#    (Mage, Kind, Tilt, Helm, Kubectl)
+#    (Kind, Tilt, Helm, Kubectl)
 # ==========================================
 
 # Kind (via Go)
