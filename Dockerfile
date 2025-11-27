@@ -49,9 +49,10 @@ ENV PATH="/root/.local/bin:${PATH}"
 # --- Polyglot Base ---
 FROM dev-base AS base-dev-poly
 
-# 1. Inherit Go Toolchain
+# 1. Inherit Go Toolchain & Tools (Mage, Kind)
 COPY --from=base-dev-go /usr/local/go /usr/local/go
-ENV PATH="/usr/local/go/bin:${PATH}"
+COPY --from=base-dev-go /root/go/bin /root/go/bin
+ENV PATH="/usr/local/go/bin:/root/go/bin:${PATH}"
 
 # 2. Inherit Node.js (Native)
 ARG NODE_VERSION=20
@@ -70,9 +71,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 python3
 #    (Mage, Kind, Tilt, Helm, Kubectl)
 # ==========================================
 
-# Mage & Kind (via Go)
-RUN go install github.com/magefile/mage@latest && \
-    go install sigs.k8s.io/kind@latest
+# Kind (via Go)
+RUN go install sigs.k8s.io/kind@latest
 
 # Helm (via Script)
 RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
