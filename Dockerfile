@@ -4,11 +4,12 @@
 # USES: JetScale Thruster (Ubuntu 24.04 + Base Tools)
 FROM ghcr.io/jetscale-ai/thruster-dev:latest AS dev-base
 
-# Add build-essential (GCC/G++) which is not in Thruster (only 'make' is)
-# but often needed for specific language extensions.
+# Add build-essential (GCC/G++) and Starship
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -sS https://starship.rs/install.sh | sh -s -- -y \
+    && echo 'eval "$(starship init bash)"' >> /root/.bashrc
 
 # USES: JetScale Thruster (Alpine 3.20 + Hardened Runtime)
 # Inherits: tini, ca-certificates, tzdata, bash, curl
@@ -26,7 +27,8 @@ COPY test /test
 FROM dev-base AS base-dev-go
 ARG GO_VERSION=1.25.4
 RUN curl -L "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz
-ENV PATH="/usr/local/go/bin:${PATH}"
+ENV PATH="/usr/local/go/bin:/root/go/bin:${PATH}"
+RUN go install github.com/magefile/mage@latest
 
 # --- TS Base ---
 FROM dev-base AS base-dev-ts
@@ -46,21 +48,48 @@ ENV PATH="/root/.local/bin:${PATH}"
 
 # --- Polyglot Base ---
 FROM dev-base AS base-dev-poly
+
+# 1. Inherit Go Toolchain
 COPY --from=base-dev-go /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:${PATH}"
 
-# Install Node.js (Native)
+# 2. Inherit Node.js (Native)
 ARG NODE_VERSION=20
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
     && apt-get install -y nodejs
 
-# Copy Global NPM Tools (pnpm, ts-node, typescript)
+# 3. Inherit Python & Global NPM Tools
 COPY --from=base-dev-ts /usr/local/bin /usr/local/bin
 COPY --from=base-dev-ts /usr/lib/node_modules /usr/lib/node_modules
-
 COPY --from=base-dev-py /root/.local /root/.local
-ENV PATH="/root/.local/bin:${PATH}"
+ENV PATH="/root/.local/bin:/root/go/bin:${PATH}"
 RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv
+
+# ==========================================
+# 4. PLATFORM ORCHESTRATION TOOLS
+#    (Mage, Kind, Tilt, Helm, Kubectl)
+# ==========================================
+
+# Mage & Kind (via Go)
+RUN go install github.com/magefile/mage@latest && \
+    go install sigs.k8s.io/kind@latest
+
+# Helm (via Script)
+RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
+    chmod 700 get_helm.sh && \
+    ./get_helm.sh && \
+    rm get_helm.sh
+
+# Kubectl (Binary)
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
+    rm kubectl
+
+# Tilt (via Script)
+RUN curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/install.sh | bash
+
+# Clean up
+RUN rm -rf /root/.cache /go/pkg/mod
 
 # ==========================================
 # 2. DEV VERIFICATION (Logic Tests + Artifact Prep)

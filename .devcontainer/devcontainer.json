@@ -1,0 +1,25 @@
+{
+  "name": "Booster (Self-Hosted)",
+  "image": "ghcr.io/jetscale-ai/booster-dev:latest",
+  "features": {
+    // Enable Docker-from-Docker to allow building the Booster images themselves
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "version": "latest",
+      "enableNonRootDocker": "true",
+      "moby": "false"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "tamasfe.even-better-toml",
+        "ms-python.python"
+      ]
+    }
+  },
+  // Mount the repo and run as root (default for raw Ubuntu images)
+  "remoteUser": "root"
+}
