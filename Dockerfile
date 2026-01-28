@@ -43,7 +43,8 @@ FROM dev-base AS base-dev-py
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/* \
-    && curl -sSL https://install.python-poetry.org | python3 -
+    && curl -sSL https://install.python-poetry.org | python3 - \
+    && curl -Ls https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
 # --- Polyglot Base ---
@@ -134,10 +135,13 @@ COPY --from=test-dev-go /tmp/artifacts/smoke-go .
 COPY --from=test-dev-ts /tmp/artifacts/smoke-ts.js .
 COPY --from=test-dev-py /tmp/artifacts/smoke-py.py .
 COPY --from=assets /test/verify_polyglot.sh .
+COPY --from=assets /test/verify_versions.sh .
 # Update script to look for "smoke-*" instead of "app-*"
 RUN sed -i 's/app-/smoke-/g' verify_polyglot.sh
 # Run Integration Check
-RUN chmod +x verify_polyglot.sh && ./verify_polyglot.sh
+RUN chmod +x verify_polyglot.sh verify_versions.sh && \
+    ./verify_versions.sh && \
+    ./verify_polyglot.sh
 RUN touch /tmp/PASSED
 
 # ==========================================
@@ -149,14 +153,47 @@ RUN touch /tmp/PASSED
 FROM base-dev-go AS booster-go-dev
 COPY --from=test-dev-go /tmp/PASSED /dev/null
 
+# Build Metadata Injection (Dev)
+# NOTE: Injected here (final stage) to avoid invalidating heavy base caches.
+ARG JETSCALE_VERSION=0.0.0-dev
+ARG JETSCALE_GIT_SHA=unknown
+ARG JETSCALE_BUILD_TIME=unknown
+ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
+    BOOSTER_COMMIT_SHA="${JETSCALE_GIT_SHA}" \
+    BOOSTER_BUILD_TIME="${JETSCALE_BUILD_TIME}"
+
 FROM base-dev-ts AS booster-ts-dev
 COPY --from=test-dev-ts /tmp/PASSED /dev/null
+
+# Build Metadata Injection (Dev)
+ARG JETSCALE_VERSION=0.0.0-dev
+ARG JETSCALE_GIT_SHA=unknown
+ARG JETSCALE_BUILD_TIME=unknown
+ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
+    BOOSTER_COMMIT_SHA="${JETSCALE_GIT_SHA}" \
+    BOOSTER_BUILD_TIME="${JETSCALE_BUILD_TIME}"
 
 FROM base-dev-py AS booster-py-dev
 COPY --from=test-dev-py /tmp/PASSED /dev/null
 
+# Build Metadata Injection (Dev)
+ARG JETSCALE_VERSION=0.0.0-dev
+ARG JETSCALE_GIT_SHA=unknown
+ARG JETSCALE_BUILD_TIME=unknown
+ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
+    BOOSTER_COMMIT_SHA="${JETSCALE_GIT_SHA}" \
+    BOOSTER_BUILD_TIME="${JETSCALE_BUILD_TIME}"
+
 FROM base-dev-poly AS booster-dev
 COPY --from=test-dev-poly /tmp/PASSED /dev/null
+
+# Build Metadata Injection (Dev)
+ARG JETSCALE_VERSION=0.0.0-dev
+ARG JETSCALE_GIT_SHA=unknown
+ARG JETSCALE_BUILD_TIME=unknown
+ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
+    BOOSTER_COMMIT_SHA="${JETSCALE_GIT_SHA}" \
+    BOOSTER_BUILD_TIME="${JETSCALE_BUILD_TIME}"
 
 # --- RUNTIME IMAGES ---
 # Depend on Runtime Capability Checks (Smoke Tests).
@@ -216,14 +253,46 @@ FROM base-run-go AS booster-go
 RUN --mount=from=test-dev-go,source=/tmp/artifacts/smoke-go,target=/tmp/check \
     /tmp/check
 
+# Build Metadata Injection (Runtime)
+ARG JETSCALE_VERSION=0.0.0-dev
+ARG JETSCALE_GIT_SHA=unknown
+ARG JETSCALE_BUILD_TIME=unknown
+ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
+    BOOSTER_COMMIT_SHA="${JETSCALE_GIT_SHA}" \
+    BOOSTER_BUILD_TIME="${JETSCALE_BUILD_TIME}"
+
 FROM base-run-js AS booster-js
 RUN --mount=from=test-dev-ts,source=/tmp/artifacts/smoke-ts.js,target=/tmp/check.js \
     node /tmp/check.js
+
+# Build Metadata Injection (Runtime)
+ARG JETSCALE_VERSION=0.0.0-dev
+ARG JETSCALE_GIT_SHA=unknown
+ARG JETSCALE_BUILD_TIME=unknown
+ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
+    BOOSTER_COMMIT_SHA="${JETSCALE_GIT_SHA}" \
+    BOOSTER_BUILD_TIME="${JETSCALE_BUILD_TIME}"
 
 FROM base-run-py AS booster-py
 RUN --mount=from=test-dev-py,source=/tmp/artifacts/smoke-py.py,target=/tmp/check.py \
     python3 /tmp/check.py
 
+# Build Metadata Injection (Runtime)
+ARG JETSCALE_VERSION=0.0.0-dev
+ARG JETSCALE_GIT_SHA=unknown
+ARG JETSCALE_BUILD_TIME=unknown
+ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
+    BOOSTER_COMMIT_SHA="${JETSCALE_GIT_SHA}" \
+    BOOSTER_BUILD_TIME="${JETSCALE_BUILD_TIME}"
+
 FROM base-run-poly AS booster
 RUN --mount=from=test-dev-poly,source=/app,target=/tmp/tests \
     cd /tmp/tests && ./verify_polyglot.sh
+
+# Build Metadata Injection (Runtime)
+ARG JETSCALE_VERSION=0.0.0-dev
+ARG JETSCALE_GIT_SHA=unknown
+ARG JETSCALE_BUILD_TIME=unknown
+ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
+    BOOSTER_COMMIT_SHA="${JETSCALE_GIT_SHA}" \
+    BOOSTER_BUILD_TIME="${JETSCALE_BUILD_TIME}"

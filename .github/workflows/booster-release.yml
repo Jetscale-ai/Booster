@@ -17,6 +17,7 @@ jobs:
       languages: "go,ts,py"
       dockerfile: ./Dockerfile
       publish_to_dockerhub: true
+      push_git_tag: true
       test_command: "go test -v ./..."
     secrets: inherit
 

@@ -24,6 +24,10 @@ on:
         required: false
         type: boolean
         default: false
+      push_git_tag:
+        required: false
+        type: boolean
+        default: false
       registry_username:
         required: false
         type: string
@@ -130,6 +134,8 @@ jobs:
         run: |
           OWNER_LC=$(echo "${OWNER}" | tr '[:upper:]' '[:lower:]')
           SHA_SHORT=$(git rev-parse --short HEAD)
+          SHA_FULL=$(git rev-parse HEAD)
+          BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
           # --- Helper: Generate Strict Tags ---
           # Output: comma-separated tags including :latest, :vX.Y.Z, :vX.Y, :vX, :sha-XXXX
@@ -185,8 +191,13 @@ jobs:
               docker buildx build \
                 --file "${{ inputs.dockerfile }}" \
                 --target "${IMAGE_NAME}-${lang_trimmed}-dev" \
+                --build-arg "JETSCALE_VERSION=${VERSION}" \
+                --build-arg "JETSCALE_GIT_SHA=${SHA_FULL}" \
+                --build-arg "JETSCALE_BUILD_TIME=${BUILD_TIME}" \
                 --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
                 --label "org.opencontainers.image.version=${VERSION}" \
+                --label "org.opencontainers.image.revision=${SHA_FULL}" \
+                --label "org.opencontainers.image.created=${BUILD_TIME}" \
                 --push \
                 --cache-from type=gha,scope=dev-${lang_trimmed} \
                 --cache-to type=gha,mode=max,scope=dev-${lang_trimmed} \
@@ -204,8 +215,13 @@ jobs:
               docker buildx build \
                 --file "${{ inputs.dockerfile }}" \
                 --target "${IMAGE_NAME}-${runtime_lang}" \
+                --build-arg "JETSCALE_VERSION=${VERSION}" \
+                --build-arg "JETSCALE_GIT_SHA=${SHA_FULL}" \
+                --build-arg "JETSCALE_BUILD_TIME=${BUILD_TIME}" \
                 --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
                 --label "org.opencontainers.image.version=${VERSION}" \
+                --label "org.opencontainers.image.revision=${SHA_FULL}" \
+                --label "org.opencontainers.image.created=${BUILD_TIME}" \
                 --push \
                 --cache-from type=gha,scope=run-${runtime_lang} \
                 --cache-to type=gha,mode=max,scope=run-${runtime_lang} \
@@ -228,8 +244,13 @@ jobs:
           docker buildx build \
             --file "${{ inputs.dockerfile }}" \
             --target "${IMAGE_NAME}-dev" \
+            --build-arg "JETSCALE_VERSION=${VERSION}" \
+            --build-arg "JETSCALE_GIT_SHA=${SHA_FULL}" \
+            --build-arg "JETSCALE_BUILD_TIME=${BUILD_TIME}" \
             --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --label "org.opencontainers.image.version=${VERSION}" \
+            --label "org.opencontainers.image.revision=${SHA_FULL}" \
+            --label "org.opencontainers.image.created=${BUILD_TIME}" \
             --push \
             --cache-from type=gha,scope=dev-polyglot \
             --cache-to type=gha,mode=max,scope=dev-polyglot \
@@ -247,9 +268,24 @@ jobs:
           docker buildx build \
             --file "${{ inputs.dockerfile }}" \
             --target "${IMAGE_NAME}" \
+            --build-arg "JETSCALE_VERSION=${VERSION}" \
+            --build-arg "JETSCALE_GIT_SHA=${SHA_FULL}" \
+            --build-arg "JETSCALE_BUILD_TIME=${BUILD_TIME}" \
             --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
             --label "org.opencontainers.image.version=${VERSION}" \
+            --label "org.opencontainers.image.revision=${SHA_FULL}" \
+            --label "org.opencontainers.image.created=${BUILD_TIME}" \
             --push \
             --cache-from type=gha,scope=run-polyglot \
             --cache-to type=gha,mode=max,scope=run-polyglot \
             $(echo "${TAGS_RUN_POLY}" | tr ',' '\n' | sed 's/^/--tag /') .
+
+      - name: Push Git Tag
+        if: inputs.push_git_tag && steps.semrel.outputs.version != '' && steps.local_check.outputs.is_local != 'true'
+        env:
+          VERSION: ${{ steps.semrel.outputs.version }}
+          PUSH_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN != '' && secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          git tag "v${VERSION}"
+          git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin "v${VERSION}"
