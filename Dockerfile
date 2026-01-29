@@ -60,6 +60,16 @@ ARG NODE_VERSION=20
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
     && apt-get install -y nodejs
 
+# 2b. GitHub CLI (gh)
+RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gh \
+    && rm -rf /var/lib/apt/lists/*
+
 # 3. Inherit Python & Global NPM Tools
 COPY --from=base-dev-ts /usr/local/bin /usr/local/bin
 COPY --from=base-dev-ts /usr/lib/node_modules /usr/lib/node_modules
@@ -242,7 +252,7 @@ ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 ENV PLAYWRIGHT_NODEJS_PATH=/usr/bin/node
 
 FROM runtime-base AS base-run-poly
-RUN apk add --no-cache libc6-compat nodejs npm python3
+RUN apk add --no-cache libc6-compat nodejs npm python3 github-cli
 
 # RELEASE TARGETS
 # The RUN --mount instructions act as the verification step.
