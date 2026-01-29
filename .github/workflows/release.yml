@@ -143,7 +143,7 @@ jobs:
             local image_ghcr="$1"
             local image_dh="$2"
             local tags=""
-            
+
             # Base Tags: Version + Latest + SHA
             local t_ghcr="${image_ghcr}:${VERSION}${SUFFIX},${image_ghcr}:latest${SUFFIX},${image_ghcr}:sha-${SHA_SHORT}${SUFFIX}"
             local t_dh=""
@@ -155,7 +155,7 @@ jobs:
             if [[ -z "$SUFFIX" && "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               local major=$(echo "$VERSION" | cut -d. -f1)
               local minor=$(echo "$VERSION" | cut -d. -f1,2)
-              
+
               t_ghcr="${t_ghcr},${image_ghcr}:${major},${image_ghcr}:${minor}"
               if [[ -n "$image_dh" ]]; then
                 t_dh="${t_dh},${image_dh}:${major},${image_dh}:${minor}"
@@ -175,7 +175,7 @@ jobs:
             for lang in "${LANGS[@]}"; do
               lang_trimmed=$(echo "$lang" | xargs)
               echo "Processing language: $lang_trimmed"
-              
+
               runtime_lang="$lang_trimmed"
               if [[ "$lang_trimmed" == "ts" ]]; then runtime_lang="js"; fi
 
@@ -186,7 +186,7 @@ jobs:
                  DH_DEV="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-${lang_trimmed}-dev"
               fi
               TAGS_DEV=$(generate_tags "$GHCR_DEV" "$DH_DEV")
-              
+
               echo "Building Dev ($lang): ${TAGS_DEV}"
               docker buildx build \
                 --file "${{ inputs.dockerfile }}" \
@@ -231,7 +231,7 @@ jobs:
 
           # --- 2. Base/Polyglot Images (Runs for everyone) ---
           echo "Processing Base/Polyglot images..."
-          
+
           # DEV Image
           GHCR_DEV_POLY="ghcr.io/${OWNER_LC}/${IMAGE_NAME}-dev"
           DH_DEV_POLY=""
@@ -239,7 +239,7 @@ jobs:
              DH_DEV_POLY="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}-dev"
           fi
           TAGS_DEV_POLY=$(generate_tags "$GHCR_DEV_POLY" "$DH_DEV_POLY")
-          
+
           echo "Building Base/Polyglot Dev: ${TAGS_DEV_POLY}"
           docker buildx build \
             --file "${{ inputs.dockerfile }}" \
@@ -263,7 +263,7 @@ jobs:
              DH_RUN_POLY="docker.io/${DOCKERHUB_USERNAME}/${IMAGE_NAME}"
           fi
           TAGS_RUN_POLY=$(generate_tags "$GHCR_RUN_POLY" "$DH_RUN_POLY")
-          
+
           echo "Building Base/Polyglot Runtime: ${TAGS_RUN_POLY}"
           docker buildx build \
             --file "${{ inputs.dockerfile }}" \
