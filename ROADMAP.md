@@ -9,7 +9,7 @@ powered by `go-semantic-release`.
 
 - [x] **The Unified Dockerfile:** Create a single `Dockerfile` with targets:
   - `dev-base` (Ubuntu 24.04)
-  - `runtime-base` (Alpine 3.20)
+  - `runtime-base` (Alpine 3.21)
   - `booster-[lang]-dev` (Go, TS, Py)
   - `booster-[lang]` (Runtime)
 - [x] **Local Build Verification:** Verify all targets build locally with

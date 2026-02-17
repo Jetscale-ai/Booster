@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -sS https://starship.rs/install.sh | sh -s -- -y \
     && echo 'eval "$(starship init bash)"' >> /root/.bashrc
 
-# USES: JetScale Thruster (Alpine 3.20 + Hardened Runtime)
+# USES: JetScale Thruster (Alpine 3.21 + Hardened Runtime)
 # Inherits: tini, ca-certificates, tzdata, bash, curl
 FROM ghcr.io/jetscale-ai/thruster:latest AS runtime-base
 

@@ -27,7 +27,7 @@ Intended for: **CI Build Jobs**, **DevContainers**, **Local Development**.
 ### 2. Runtime Images (no suffix)
 
 Based on **[JetScale Thruster](https://github.com/jetscale-ai/thruster)**
-(Alpine 3.20). Minimal footprint, hardened. Intended for: **Production
+(Alpine 3.21). Minimal footprint, hardened. Intended for: **Production
 Containers**.
 
 - `ghcr.io/jetscale-ai/booster`
