@@ -4,12 +4,12 @@
 # USES: JetScale Thruster (Ubuntu 24.04 + Base Tools)
 FROM ghcr.io/jetscale-ai/thruster-dev:latest AS dev-base
 
-# Add build-essential (GCC/G++) and Starship
+# Add build-essential (GCC/G++) and Starship (available to all users via /etc/profile.d)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && curl -sS https://starship.rs/install.sh | sh -s -- -y \
-    && echo 'eval "$(starship init bash)"' >> /root/.bashrc
+    && echo 'eval "$(starship init bash)"' >> /etc/profile.d/starship.sh
 
 # USES: JetScale Thruster (Alpine 3.21 + Hardened Runtime)
 # Inherits: tini, ca-certificates, tzdata, bash, curl
@@ -50,10 +50,11 @@ ENV PATH="/root/.local/bin:${PATH}"
 # --- Polyglot Base ---
 FROM dev-base AS base-dev-poly
 
-# 1. Inherit Go Toolchain & Tools (Mage)
+# 1. Inherit Go Toolchain; place user-built binaries (Mage) in /usr/local/bin
 COPY --from=base-dev-go /usr/local/go /usr/local/go
-COPY --from=base-dev-go /root/go/bin /root/go/bin
-ENV PATH="/usr/local/go/bin:/root/go/bin:${PATH}"
+COPY --from=base-dev-go /root/go/bin/mage /usr/local/bin/mage
+ENV PATH="/usr/local/go/bin:${PATH}"
+RUN echo 'export PATH="/usr/local/go/bin:${PATH}"' > /etc/profile.d/golang.sh
 
 # 2. Inherit Node.js (Native)
 ARG NODE_VERSION=20
@@ -70,20 +71,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg \
     && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Inherit Python & Global NPM Tools
-COPY --from=base-dev-ts /usr/local/bin /usr/local/bin
+# 3. Inherit Global NPM Tools + Install Python Toolchain
 COPY --from=base-dev-ts /usr/lib/node_modules /usr/lib/node_modules
-COPY --from=base-dev-py /root/.local /root/.local
-ENV PATH="/root/.local/bin:/root/go/bin:${PATH}"
-RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv
+RUN ln -sf /usr/lib/node_modules/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm \
+    && ln -sf /usr/lib/node_modules/typescript/bin/tsc /usr/local/bin/tsc \
+    && ln -sf /usr/lib/node_modules/ts-node/dist/bin.js /usr/local/bin/ts-node
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-venv sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# 4. Python Dev Tools (Poetry & UV) — installed to shared paths
+ENV POETRY_HOME="/opt/poetry"
+RUN curl -sSL https://install.python-poetry.org | python3 - \
+    && ln -s /opt/poetry/bin/poetry /usr/local/bin/poetry \
+    && curl -Ls https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
 # ==========================================
-# 4. PLATFORM ORCHESTRATION TOOLS
+# 5. PLATFORM ORCHESTRATION TOOLS
 #    (Kind, Tilt, Helm, Kubectl)
 # ==========================================
 
-# Kind (via Go)
-RUN go install sigs.k8s.io/kind@latest
+# Kind (via Go, then moved to /usr/local/bin for all users)
+RUN go install sigs.k8s.io/kind@latest \
+    && mv /root/go/bin/kind /usr/local/bin/kind
 
 # Helm (via Script)
 RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
@@ -100,7 +110,7 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 RUN curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/install.sh | bash
 
 # Clean up
-RUN rm -rf /root/.cache /go/pkg/mod
+RUN rm -rf /root/.cache /root/go /go/pkg/mod
 
 # ==========================================
 # 2. DEV VERIFICATION (Logic Tests + Artifact Prep)
@@ -196,6 +206,15 @@ ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
 
 FROM base-dev-poly AS booster-dev
 COPY --from=test-dev-poly /tmp/PASSED /dev/null
+
+# Ensure the ubuntu user (from thruster-dev base) has sudo and a login shell
+RUN usermod -aG sudo -s /bin/bash ubuntu \
+    && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
+    && chmod 0440 /etc/sudoers.d/ubuntu
+
+# Devcontainer health-check: verify every tool is reachable as the ubuntu user
+RUN --mount=from=assets,source=/test/verify_devcontainer.sh,target=/tmp/verify_devcontainer.sh \
+    su - ubuntu -c 'bash /tmp/verify_devcontainer.sh'
 
 # Build Metadata Injection (Dev)
 ARG JETSCALE_VERSION=0.0.0-dev
