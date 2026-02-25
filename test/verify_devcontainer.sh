@@ -37,9 +37,16 @@ check "helm"     "helm version --short"
 check "tilt"     "tilt version"
 
 echo "=== Dev Utilities ==="
-check "gh"       "gh --version"
-check "starship" "starship --version"
-check "sudo"     "sudo -n true && echo ok"
+check "gh"         "gh --version"
+check "gh-act"     "gh act --help"
+check "starship"   "starship --version"
+check "sudo"       "sudo -n true && echo ok"
+
+echo "=== Security & Workflow Tools ==="
+check "gitleaks"   "gitleaks version"
+check "trivy"      "trivy --version"
+check "just"       "just --version"
+check "pre-commit" "pre-commit --version"
 
 if [ "$FAIL" -ne 0 ]; then
   echo ""

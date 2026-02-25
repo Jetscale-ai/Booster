@@ -109,6 +109,28 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 # Tilt (via Script)
 RUN curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/install.sh | bash
 
+# ==========================================
+# 6. SECURITY & DEV WORKFLOW TOOLS
+#    (Gitleaks, Trivy, Just, Pre-commit)
+# ==========================================
+
+# Gitleaks (secret detection — binary from GitHub Releases)
+RUN GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+      | grep '"tag_name":' | sed 's/.*"v\([^"]*\)".*/\1/') \
+    && curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_amd64.tar.gz" \
+      | tar -xz -C /usr/local/bin gitleaks
+
+# Trivy (vulnerability scanner)
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+      | sh -s -- -b /usr/local/bin
+
+# Just (task runner)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh \
+      | bash -s -- --to /usr/local/bin
+
+# Pre-commit (Git hook framework)
+RUN python3 -m pip install --break-system-packages pre-commit
+
 # Clean up
 RUN rm -rf /root/.cache /root/go /go/pkg/mod
 
@@ -211,6 +233,9 @@ COPY --from=test-dev-poly /tmp/PASSED /dev/null
 RUN usermod -aG sudo -s /bin/bash ubuntu \
     && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
+
+# gh-act: local GitHub Actions runner (user-scoped gh extension)
+RUN su - ubuntu -c 'gh extension install nektos/gh-act'
 
 # Devcontainer health-check: verify every tool is reachable as the ubuntu user
 RUN --mount=from=assets,source=/test/verify_devcontainer.sh,target=/tmp/verify_devcontainer.sh \
