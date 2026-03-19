@@ -62,16 +62,21 @@ jobs:
       version: ${{ steps.release_meta.outputs.version }}
       released: ${{ steps.release_meta.outputs.released }}
     runs-on: namespace-profile-jetscale-build
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: namespacelabs/nscloud-checkout-action@v8
         with:
           fetch-depth: 0
+          token: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN != '' && secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref }}
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
+          cache: false
 
       - name: Run Tests
         if: inputs.test_command != ''
@@ -127,7 +132,7 @@ jobs:
 
       - name: Login to GHCR
         if: steps.semrel.outputs.version != '' || steps.local_check.outputs.is_local == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ inputs.registry_username != '' && inputs.registry_username || (secrets.JETSCALEBOT_GITHUB_TOKEN != '' && 'jetscalebot' || github.actor) }}
@@ -135,14 +140,16 @@ jobs:
 
       - name: Login to Docker Hub
         if: (steps.semrel.outputs.version != '' || steps.local_check.outputs.is_local == 'true') && inputs.publish_to_dockerhub && steps.check_secrets.outputs.has_dockerhub == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Setup Docker Buildx
         if: steps.semrel.outputs.version != '' || steps.local_check.outputs.is_local == 'true'
-        uses: docker/setup-buildx-action@v3
+        uses: namespacelabs/nscloud-setup-buildx-action@v0
+        with:
+          wait-for-builder: true
 
       - name: Build and Push Images
         if: steps.semrel.outputs.version != '' || steps.local_check.outputs.is_local == 'true'
