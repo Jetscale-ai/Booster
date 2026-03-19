@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch: {}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release:
     permissions:
@@ -20,3 +23,37 @@ jobs:
       push_git_tag: true
       test_command: "go test -v ./..."
     secrets: inherit
+
+  trigger-backend-base:
+    name: Trigger backend-base release
+    needs: release
+    if: github.ref == 'refs/heads/main' && needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Dispatch backend-base workflow
+        env:
+          GH_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            repos/Jetscale-ai/backend-base/actions/workflows/release-backend-base.yml/dispatches \
+            -f ref=main
+
+  trigger-frontend:
+    name: Trigger frontend pipeline
+    needs: release
+    if: github.ref == 'refs/heads/main' && needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Dispatch frontend workflow
+        env:
+          GH_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            repos/Jetscale-ai/frontend/actions/workflows/pipeline.yml/dispatches \
+            -f ref=main

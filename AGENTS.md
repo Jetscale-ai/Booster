@@ -1,61 +1,165 @@
-# The Eudaimonia Framework: Booster Protocol
+# JetScale Booster Constitution
 
-This is the **Constitution** for all AI agents and human contributors working on
-the `booster` repository.
+<!-- markdownlint-disable MD013 -->
 
-## 1. Ethos (Character & Being)
+**Status:** Ratified **Version:** 3.0.0 **Blueprint:** `library`
+(`.agents/codex/blueprints/library.md`) **Stack:** `go-mod`
+(`.agents/codex/stacks/go-mod.md`) **Authority:**
+[Supreme Constitution](https://github.com/Jetscale-ai/Governance/blob/main/AGENTS.md)
 
-1. **Legitimacy (GitHub-Native):** All solutions must use **native GitHub
-   Actions paradigms** (DooD, `workflow_call`, `GITHUB_OUTPUT`). We do not port
-   legacy scripts; we reimplement intent using modern primitives.
-2. **Identity (The Booster Metaphor):** We build "Boosters"—heavy lift vehicles
-   (images/workflows) that get other projects into orbit. We are infrastructure,
-   not the payload. We must be reliable, reusable, and robust.
-3. **Purpose (Frictionless Release):** Our sole purpose is to allow a developer
-   to drop 10 lines of YAML into their repo and achieve a perfect, secure,
-   multi-arch release pipeline.
-4. **Aisthesis (The Aesthetic of Logs):** CI logs are our user interface. We
-   ensure `go-semantic-release` and `docker` outputs are clean, grouped, and
-   debuggable. We do not pollute the console with raw secrets or unformatted
-   JSON.
+This document is the delegated constitution for `Jetscale-ai/Booster`. It adapts
+the Governance constitution to a shared CI/CD tooling repository that publishes
+base images, reusable workflows, and downstream pipeline handoffs.
 
-## 2. Logos (Reason & Internal Order)
+---
 
-5. **Prudence (Security & Caching):**
-   - **Permissions:** We operate with Least Privilege. We explicitly define
-     `permissions: { contents: write, packages: write }`. We never rely on
-     implicit token scopes.
-   - **Secrets:** We assume `secrets: inherit` but validate critical secrets
-     (Docker Hub) exist before attempting operations that require them.
-   - **Caching:** GitHub Runners are ephemeral. We **must** implement
-     `cache-from: type=gha` and `cache-to: type=gha` for Docker builds to avoid
-     10-minute build times.
-6. **Clarity (The Single Source of Truth):** `go-semantic-release` is the
-   **sole** arbiter of versioning. We do not parse `package.json`,
-   `pyproject.toml`, or `go.mod` for versions. The Git history drives the tag.
-7. **Vigor (Performance):** We use Multi-Stage Builds to separate "Dev"
-   (Heavy/Ubuntu) from "Runtime" (Lean/Alpine). We do not ship build tools to
-   production.
-8. **Elenchus (Testing the Pipe):** We verify our own workflows. The `booster`
-   repo itself must use the `release.yml` workflow to release its own images.
+## 0. Situational Awareness (Required Context)
 
-## 3. Praxis (Action & Interaction)
+### 0.1 Universal Red Lines (Excerpt)
 
-9. **Concord (Polyglot Unity):** We support Go, TypeScript, and Python from a
-   **single** Dockerfile and a **single** workflow. We do not fracture into
-   separate repos for each language.
-10. **Symbiosis (The Caller Contract):** We respect the interface. The caller
-    provides the `image_name` and `languages`. We provide the machinery. We do
-    not break this contract without a major version bump.
-11. **Justice (Graceful Degradation):** If Docker Hub credentials are missing,
-    we warn and continue (pushing only to GHCR). We do not fail the pipeline for
-    optional external registries.
-12. **Wisdom (Evolution):** We anticipate new languages (Rust, Java). Our `for`
-    loops and matrix strategies must be extensible via simple string inputs, not
-    code refactors.
+- Agents must never execute commits, pushes, or tags.
+- Agents must never output, log, or persist secrets.
+- Agents must never impersonate humans.
 
-## Operational Mandates
+### 0.2 Default Failure Mode
 
-- **No DinD Service:** Use the runner's native Docker daemon.
-- **No Raw Shell Output:** Capture outputs via `$GITHUB_OUTPUT`.
-- **Strict Tagging:** Always push `:commit-sha`, `:version`, and `:latest`.
+If instructions conflict, evidence is ambiguous, or blast radius is unknown:
+
+1. STOP.
+2. AUDIT assumptions and current state.
+3. ASK the human before proceeding.
+
+### 0.3 Eudaimonia is 12 Invariants
+
+The Eudaimonia Framework is the full set of 12 universal invariants. Any
+`audit_log:` in commits or PRs must cite only the invariants that actually
+applied for that change.
+
+### 0.4 Tooling Preflight (Mandatory)
+
+Before bootstrapping canonical law, verify:
+
+```bash
+require_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }; }
+
+require_cmd gh
+gh auth status -h github.com >/dev/null 2>&1 || { echo "gh not authenticated for github.com" >&2; exit 1; }
+require_cmd base64
+require_cmd sed
+
+# Repo toolchain
+require_cmd go
+require_cmd docker
+```
+
+### 0.5 Load Canonical Law (How)
+
+On each new session, load the ratified Governance artifacts from
+`Jetscale-ai/Governance@main` before giving substantive guidance:
+
+```bash
+gh api repos/Jetscale-ai/Governance/contents/AGENTS.md --jq .content | base64 -d
+gh api repos/Jetscale-ai/Governance/contents/.agents/codex/protocols/bootstrap.md --jq .content | base64 -d
+gh api repos/Jetscale-ai/Governance/contents/.agents/codex/protocols/ratification.md --jq .content | base64 -d
+gh api repos/Jetscale-ai/Governance/contents/.agents/codex/protocols/audit-trail.md --jq .content | base64 -d
+gh api repos/Jetscale-ai/Governance/contents/.agents/codex/protocols/ci-monitoring.md --jq .content | base64 -d
+gh api repos/Jetscale-ai/Governance/contents/.agents/codex/blueprints/library.md --jq .content | base64 -d
+gh api repos/Jetscale-ai/Governance/contents/.agents/codex/stacks/go-mod.md --jq .content | base64 -d
+```
+
+### 0.6 Hard Stop on Missing Law
+
+If canonical law cannot be retrieved, agents must not invent governance. Enter
+Advisory Mode and request human intervention.
+
+### 0.7 Load Local Operations (How)
+
+Load repository-local operations before providing commands or verification
+steps:
+
+```bash
+sed -n '1,200p' .agents/AGENTS.md
+```
+
+Or via GitHub API:
+
+```bash
+gh api repos/Jetscale-ai/Booster/contents/.agents/AGENTS.md --jq .content | base64 -d
+```
+
+## 0.8 Codex Ratification
+
+This constitution ratifies the following Governance artifacts on
+`Jetscale-ai/Governance@main`:
+
+| Artifact               | Path                                       |
+| :--------------------- | :----------------------------------------- |
+| Supreme Constitution   | `AGENTS.md`                                |
+| Bootstrap Protocol     | `.agents/codex/protocols/bootstrap.md`     |
+| Ratification Protocol  | `.agents/codex/protocols/ratification.md`  |
+| Audit Trail Protocol   | `.agents/codex/protocols/audit-trail.md`   |
+| CI Monitoring Protocol | `.agents/codex/protocols/ci-monitoring.md` |
+| Library Blueprint      | `.agents/codex/blueprints/library.md`      |
+| Go Modules Stack       | `.agents/codex/stacks/go-mod.md`           |
+
+### On-Demand Codex Loading
+
+| Trigger                           | Required Artifact                                        |
+| :-------------------------------- | :------------------------------------------------------- |
+| Commit and traceability questions | `.agents/codex/protocols/audit-trail.md`                 |
+| CI failures after direct pushes   | `.agents/codex/protocols/ci-monitoring.md`               |
+| Branch protection questions       | `.agents/codex/protocols/branch-protection.md`           |
+| Tooling selection and bootstrap   | `.agents/codex/protocols/tooling-tiers.md`               |
+| Commit format                     | `.agents/codex/skills/core/conventional-commit/SKILL.md` |
+
+## 0.9 Repository Declaration
+
+- **Owner:** Paul (Founding Engineer)
+- **Risk Level:** Medium
+- **Primary Artifact:** Base images and reusable GitHub Actions workflows
+- **Downstream Surface:** `thruster -> booster -> backend-base`, and
+  `booster -> frontend`
+- **Namespace Profile:** `namespace-profile-jetscale-build`
+
+---
+
+## 1. Repository Purpose
+
+Booster is shared operational machinery. It publishes polyglot developer/runtime
+images and the reusable release workflow consumed by sibling repositories.
+
+Core mandates:
+
+- Keep the reusable workflow GitHub-native (`workflow_call`, `GITHUB_OUTPUT`,
+  least-privilege permissions).
+- Use Namespace-backed runner improvements when they reduce CI latency or
+  improve determinism.
+- Treat CI logs as a user interface: concise, grouped, and free of secret
+  leakage.
+
+## 2. Release Contract
+
+- Reusable workflow: `.github/workflows/release.yml`
+- Top-level workflow: `.github/workflows/booster-release.yml`
+- The reusable workflow is the single release contract for downstream image
+  repositories such as `thruster` and `backend-base`.
+- Versioning is driven by semantic-release from git history, not by parsing
+  language manifests.
+
+## 3. Architectural Invariants
+
+- A single Dockerfile remains the source of truth for polyglot images.
+- Dev and runtime stages must remain separated; no build-only tooling in runtime
+  images.
+- Missing Docker Hub credentials degrade gracefully to GHCR-only publishing.
+- Downstream fan-out from top-level workflows must use explicit
+  `workflow_dispatch` calls, not implicit image polling.
+
+## 4. Documentation Currency
+
+README, workflow docs, and repo law must match the live codebase:
+
+- Canonical org/repo links should use `Jetscale-ai/*`
+- Published image families and tool inventories must reflect the current
+  Dockerfile
+- Release-chain documentation must reflect the actual dispatch graph

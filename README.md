@@ -14,7 +14,7 @@ We publish two families of images to GHCR and Docker Hub:
 
 ### 1. Dev Images (`-dev`)
 
-Based on **[JetScale Thruster Dev](https://github.com/jetscale-ai/thruster)**
+Based on **[JetScale Thruster Dev](https://github.com/Jetscale-ai/Thruster)**
 (Ubuntu 24.04). Includes build tools (`curl`, `git`, `make`, `jq`, `yq`,
 `build-essential`) and language toolchains (Go, Node, Python, `poetry`, `uv`),
 plus operator CLIs like `gh`, `devbox`, and `nsc`. Intended for: **CI Build
@@ -27,7 +27,7 @@ Jobs**, **DevContainers**, **Local Development**.
 
 ### 2. Runtime Images (no suffix)
 
-Based on **[JetScale Thruster](https://github.com/jetscale-ai/thruster)**
+Based on **[JetScale Thruster](https://github.com/Jetscale-ai/Thruster)**
 (Alpine 3.21). Minimal footprint, hardened. Intended for: **Production
 Containers**.
 
@@ -50,7 +50,7 @@ on:
 
 jobs:
   release:
-    uses: jetscale-ai/booster/.github/workflows/release.yml@main
+    uses: Jetscale-ai/Booster/.github/workflows/release.yml@main
     with:
       image_name: my-service-name
       languages: "go" # or "ts", "py", "go,ts"
@@ -78,6 +78,8 @@ jobs:
 
 - `Dockerfile`: Single multi-stage file defining all image variants.
 - `.github/workflows/release.yml`: The core logic.
+- `.github/workflows/booster-release.yml`: Top-level release entrypoint and
+  downstream dispatch.
 - `.semrel.yaml`: Configuration for `go-semantic-release`.
 - `.pre-commit-config.yaml`: Pre-commit hooks for code quality.
 - `.golangci.yml`: Go linter configuration.
@@ -116,6 +118,15 @@ The pre-commit hooks include:
 2. Update `release.yml` if any special handling is needed (the loop is generic).
 3. Update `README.md`.
 4. Add language-specific pre-commit hooks to `.pre-commit-config.yaml`.
+
+## Release Topology
+
+- `thruster` dispatches `booster-release.yml` after a successful `main` release.
+- `booster-release.yml` publishes Booster and then dispatches:
+  - `backend-base/.github/workflows/release-backend-base.yml`
+  - `frontend/.github/workflows/pipeline.yml`
+- The shared reusable workflow adopts Namespace checkout/buildx optimizations
+  and now uses `actions/setup-go@v6` to reduce Node 20 deprecation noise.
 
 ## Local Testing (act)
 

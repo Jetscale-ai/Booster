@@ -73,7 +73,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.25"
           cache: false
@@ -93,12 +93,40 @@ jobs:
             echo "suffix=" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Install semantic-release CLI
+        if: steps.local_check.outputs.is_local != 'true'
+        run: |
+          case "$(uname -m)" in
+            x86_64|amd64) SEMREL_ARCH="amd64" ;;
+            aarch64|arm64) SEMREL_ARCH="arm64" ;;
+            *)
+              echo "Unsupported architecture: $(uname -m)" >&2
+              exit 1
+              ;;
+          esac
+
+          curl -fsSL "https://get-release.xyz/semantic-release/linux/${SEMREL_ARCH}" \
+            -o /usr/local/bin/semantic-release
+          chmod +x /usr/local/bin/semantic-release
+
       - name: Semantic Release
         id: semrel
         if: steps.local_check.outputs.is_local != 'true'
-        uses: go-semantic-release/action@v1
-        with:
-          github-token: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN != '' && secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN != '' && secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          rm -f .version
+
+          semantic-release \
+            --download-plugins \
+            --allow-no-changes \
+            --version-file \
+            --token "${GITHUB_TOKEN}"
+
+          if [[ -f .version ]]; then
+            VERSION="$(tr -d '\n' < .version)"
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Fake version locally
         id: semrel_local
