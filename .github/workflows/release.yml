@@ -58,6 +58,7 @@ concurrency:
 
 jobs:
   ci-and-release:
+    name: Release image
     outputs:
       version: ${{ steps.release_meta.outputs.version }}
       released: ${{ steps.release_meta.outputs.released }}

@@ -25,7 +25,7 @@ jobs:
     secrets: inherit
 
   trigger-backend-base:
-    name: Trigger backend-base release
+    name: Trigger backend base release
     needs: release
     if: github.ref == 'refs/heads/main' && needs.release.result == 'success'
     runs-on: ubuntu-latest
