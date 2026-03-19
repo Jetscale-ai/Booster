@@ -1,0 +1,17 @@
+{
+  "plugins": {
+    "commit-analyzer": {
+      "name": "default",
+      "options": {
+        "minor_release_rules": "feat",
+        "patch_release_rules": "fix"
+      }
+    },
+    "changelog-generator": {
+      "name": "default"
+    },
+    "provider": {
+      "name": "github"
+    }
+  }
+}

@@ -19,7 +19,7 @@ powered by `go-semantic-release`.
 
 > _Goal: Automatic version determination without language dependencies._
 
-- [x] **Configuration:** Create `.semrel.yaml` for `go-semantic-release`.
+- [x] **Configuration:** Create `.semrelrc` for `go-semantic-release`.
   - Configure "Conventional Commits" parser.
   - Define branch rules (`main`, `next`, `beta`, `alpha`).
   - Set tag format `v{{version}}`.

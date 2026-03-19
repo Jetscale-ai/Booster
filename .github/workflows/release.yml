@@ -119,7 +119,6 @@ jobs:
           rm -f .version
 
           semantic-release \
-            --download-plugins \
             --allow-no-changes \
             --version-file \
             --token "${GITHUB_TOKEN}"

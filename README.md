@@ -80,7 +80,7 @@ jobs:
 - `.github/workflows/release.yml`: The core logic.
 - `.github/workflows/booster-release.yml`: Top-level release entrypoint and
   downstream dispatch.
-- `.semrel.yaml`: Configuration for `go-semantic-release`.
+- `.semrelrc`: Configuration for `go-semantic-release`.
 - `.pre-commit-config.yaml`: Pre-commit hooks for code quality.
 - `.golangci.yml`: Go linter configuration.
 
