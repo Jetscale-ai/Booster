@@ -71,6 +71,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg \
     && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
+# 2c. Devbox + Namespace CLI (nsc)
+ARG DEVBOX_VERSION=0.17.0
+ARG NSC_VERSION=0.0.490
+RUN set -eux; \
+    case "$(dpkg --print-architecture)" in \
+      amd64) ARCH=amd64 ;; \
+      arm64) ARCH=arm64 ;; \
+      *) echo "Unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://github.com/jetify-com/devbox/releases/download/${DEVBOX_VERSION}/devbox_${DEVBOX_VERSION}_linux_${ARCH}.tar.gz" \
+      | tar -xz -C /usr/local/bin devbox; \
+    curl -fsSL "https://github.com/namespacelabs/foundation/releases/download/v${NSC_VERSION}/nsc_${NSC_VERSION}_linux_${ARCH}.tar.gz" \
+      | tar -xz -C /usr/local/bin nsc; \
+    devbox version; \
+    nsc version
+
 # 3. Inherit Global NPM Tools + Install Python Toolchain
 COPY --from=base-dev-ts /usr/lib/node_modules /usr/lib/node_modules
 RUN ln -sf /usr/lib/node_modules/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm \
@@ -115,9 +131,15 @@ RUN curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/in
 # ==========================================
 
 # Gitleaks (secret detection — binary from GitHub Releases)
-RUN GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
-      | grep '"tag_name":' | sed 's/.*"v\([^"]*\)".*/\1/') \
-    && curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_amd64.tar.gz" \
+RUN set -eux; \
+    GITLEAKS_VERSION="$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+      | grep '"tag_name":' | sed 's/.*"v\([^"]*\)".*/\1/')"; \
+    case "$(dpkg --print-architecture)" in \
+      amd64) GITLEAKS_ARCH=x64 ;; \
+      arm64) GITLEAKS_ARCH=arm64 ;; \
+      *) echo "Unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
+    esac; \
+    curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz" \
       | tar -xz -C /usr/local/bin gitleaks
 
 # Trivy (vulnerability scanner)
@@ -235,7 +257,18 @@ RUN usermod -aG sudo -s /bin/bash ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
 
 # gh-act: local GitHub Actions runner (user-scoped gh extension)
-RUN su - ubuntu -c 'gh extension install nektos/gh-act'
+ARG GH_ACT_VERSION=0.2.84
+RUN set -eux; \
+    case "$(dpkg --print-architecture)" in \
+      amd64) GH_ACT_ARCH=amd64 ;; \
+      arm64) GH_ACT_ARCH=arm64 ;; \
+      *) echo "Unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
+    esac; \
+    install -d -m 0755 /home/ubuntu/.local/share/gh/extensions/gh-act; \
+    curl -fsSL "https://github.com/nektos/gh-act/releases/download/v${GH_ACT_VERSION}/linux-${GH_ACT_ARCH}" \
+      -o /home/ubuntu/.local/share/gh/extensions/gh-act/gh-act; \
+    chmod 0755 /home/ubuntu/.local/share/gh/extensions/gh-act/gh-act; \
+    chown -R ubuntu:ubuntu /home/ubuntu/.local
 
 # Devcontainer health-check: verify every tool is reachable as the ubuntu user
 RUN --mount=from=assets,source=/test/verify_devcontainer.sh,target=/tmp/verify_devcontainer.sh \

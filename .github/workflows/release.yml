@@ -40,6 +40,13 @@ on:
         required: false
       JETSCALEBOT_GITHUB_TOKEN:
         required: false
+    outputs:
+      version:
+        description: "Released version, if one was published"
+        value: ${{ jobs.ci-and-release.outputs.version }}
+      released:
+        description: "Whether this run published a release"
+        value: ${{ jobs.ci-and-release.outputs.released }}
 
 permissions:
   contents: write
@@ -51,6 +58,9 @@ concurrency:
 
 jobs:
   ci-and-release:
+    outputs:
+      version: ${{ steps.release_meta.outputs.version }}
+      released: ${{ steps.release_meta.outputs.released }}
     runs-on: namespace-profile-jetscale-build
     steps:
       - name: Checkout
@@ -90,6 +100,18 @@ jobs:
         if: steps.local_check.outputs.is_local == 'true'
         run: |
           echo "version=0.0.0-local" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve Release Metadata
+        id: release_meta
+        run: |
+          VERSION="${{ steps.semrel.outputs.version || steps.semrel_local.outputs.version }}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+          if [[ -n "${{ steps.semrel.outputs.version }}" ]]; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check Secrets
         id: check_secrets

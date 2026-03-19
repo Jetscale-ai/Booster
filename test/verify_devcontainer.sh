@@ -39,6 +39,8 @@ check "tilt"     "tilt version"
 echo "=== Dev Utilities ==="
 check "gh"         "gh --version"
 check "gh-act"     "gh act --help"
+check "devbox"     "devbox version"
+check "nsc"        "nsc version"
 check "starship"   "starship --version"
 check "sudo"       "sudo -n true && echo ok"
 

@@ -16,8 +16,9 @@ We publish two families of images to GHCR and Docker Hub:
 
 Based on **[JetScale Thruster Dev](https://github.com/jetscale-ai/thruster)**
 (Ubuntu 24.04). Includes build tools (`curl`, `git`, `make`, `jq`, `yq`,
-`build-essential`) and language toolchains (Go, Node, Python, `poetry`, `uv`).
-Intended for: **CI Build Jobs**, **DevContainers**, **Local Development**.
+`build-essential`) and language toolchains (Go, Node, Python, `poetry`, `uv`),
+plus operator CLIs like `gh`, `devbox`, and `nsc`. Intended for: **CI Build
+Jobs**, **DevContainers**, **Local Development**.
 
 - `ghcr.io/jetscale-ai/booster-dev` (Polyglot)
 - `ghcr.io/jetscale-ai/booster-go-dev`
