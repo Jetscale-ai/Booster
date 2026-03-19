@@ -1,16 +1,84 @@
 name: Booster Release
+run-name: >-
+  ${{
+    github.event_name == 'workflow_dispatch' && github.event.inputs.upstream_repo != '' &&
+    format('Booster Release <- {0} #{1}', github.event.inputs.upstream_repo, github.event.inputs.upstream_run_id) ||
+    'Booster Release'
+  }}
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      upstream_repo:
+        description: "Repository that dispatched this workflow"
+        required: false
+        type: string
+        default: ""
+      upstream_workflow:
+        description: "Upstream workflow name"
+        required: false
+        type: string
+        default: ""
+      upstream_run_id:
+        description: "Upstream workflow run ID"
+        required: false
+        type: string
+        default: ""
+      upstream_run_url:
+        description: "Upstream workflow run URL"
+        required: false
+        type: string
+        default: ""
+      upstream_sha:
+        description: "Upstream commit SHA"
+        required: false
+        type: string
+        default: ""
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  summarize-upstream:
+    name: Summarize upstream trigger
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write trigger summary
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          UPSTREAM_REPO: ${{ github.event.inputs.upstream_repo || '' }}
+          UPSTREAM_WORKFLOW: ${{ github.event.inputs.upstream_workflow || '' }}
+          UPSTREAM_RUN_ID: ${{ github.event.inputs.upstream_run_id || '' }}
+          UPSTREAM_RUN_URL: ${{ github.event.inputs.upstream_run_url || '' }}
+          UPSTREAM_SHA: ${{ github.event.inputs.upstream_sha || github.sha }}
+        run: |
+          echo "## Trigger Context" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$UPSTREAM_REPO" ]]; then
+            echo "- Mode: Downstream dispatch" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Upstream repo: \`$UPSTREAM_REPO\`" >> "$GITHUB_STEP_SUMMARY"
+            if [[ -n "$UPSTREAM_WORKFLOW" ]]; then
+              echo "- Upstream workflow: \`$UPSTREAM_WORKFLOW\`" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            if [[ -n "$UPSTREAM_RUN_URL" ]]; then
+              echo "- Upstream run: [${UPSTREAM_RUN_ID:-open}]($UPSTREAM_RUN_URL)" >> "$GITHUB_STEP_SUMMARY"
+            elif [[ -n "$UPSTREAM_RUN_ID" ]]; then
+              echo "- Upstream run ID: \`$UPSTREAM_RUN_ID\`" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo "- Upstream SHA: \`$UPSTREAM_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Mode: Direct ${EVENT_NAME}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Repo: \`${GITHUB_REPOSITORY}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Ref: \`${GITHUB_REF}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "- SHA: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   release:
+    needs: summarize-upstream
     permissions:
       contents: write
       packages: write
@@ -36,10 +104,27 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          gh api \
-            --method POST \
-            repos/Jetscale-ai/backend-base/actions/workflows/release-backend-base.yml/dispatches \
-            -f ref=main
+          DISPATCH_OUTPUT=$(gh workflow run "release-backend-base.yml" \
+            --repo Jetscale-ai/backend-base \
+            --ref main \
+            -f upstream_repo="${GITHUB_REPOSITORY}" \
+            -f upstream_workflow="${GITHUB_WORKFLOW}" \
+            -f upstream_run_id="${GITHUB_RUN_ID}" \
+            -f upstream_run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            -f upstream_sha="${GITHUB_SHA}" 2>&1)
+
+          echo "$DISPATCH_OUTPUT"
+
+          DOWNSTREAM_URL=$(printf '%s\n' "$DISPATCH_OUTPUT" | rg -o 'https://github\.com/[^[:space:]]+/actions/runs/[0-9]+' -N -m 1 || true)
+          DOWNSTREAM_RUN_ID=$(printf '%s\n' "$DOWNSTREAM_URL" | rg -o '[0-9]+$' -N -m 1 || true)
+
+          echo "## Downstream Dispatches" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "$DOWNSTREAM_URL" ]]; then
+            echo "- Backend Base: [${DOWNSTREAM_RUN_ID:-open}]($DOWNSTREAM_URL)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Backend Base: dispatched successfully, run URL not captured" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   trigger-frontend:
     name: Trigger frontend pipeline
@@ -53,7 +138,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          gh api \
-            --method POST \
-            repos/Jetscale-ai/frontend/actions/workflows/pipeline.yml/dispatches \
-            -f ref=main
+          DISPATCH_OUTPUT=$(gh workflow run "pipeline.yml" \
+            --repo Jetscale-ai/frontend \
+            --ref main \
+            -f upstream_repo="${GITHUB_REPOSITORY}" \
+            -f upstream_workflow="${GITHUB_WORKFLOW}" \
+            -f upstream_run_id="${GITHUB_RUN_ID}" \
+            -f upstream_run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            -f upstream_sha="${GITHUB_SHA}" 2>&1)
+
+          echo "$DISPATCH_OUTPUT"
+
+          DOWNSTREAM_URL=$(printf '%s\n' "$DISPATCH_OUTPUT" | rg -o 'https://github\.com/[^[:space:]]+/actions/runs/[0-9]+' -N -m 1 || true)
+          DOWNSTREAM_RUN_ID=$(printf '%s\n' "$DOWNSTREAM_URL" | rg -o '[0-9]+$' -N -m 1 || true)
+
+          echo "## Downstream Dispatches" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "$DOWNSTREAM_URL" ]]; then
+            echo "- Frontend: [${DOWNSTREAM_RUN_ID:-open}]($DOWNSTREAM_URL)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Frontend: dispatched successfully, run URL not captured" >> "$GITHUB_STEP_SUMMARY"
+          fi
