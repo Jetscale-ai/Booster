@@ -97,10 +97,14 @@ jobs:
     needs: release
     if: github.ref == 'refs/heads/main' && needs.release.result == 'success'
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ 'downstream-backend-base' }}
+      url: ${{ steps.dispatch_backend_base.outputs.downstream_url }}
     permissions:
       contents: read
     steps:
       - name: Dispatch backend-base workflow
+        id: dispatch_backend_base
         env:
           GH_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
@@ -115,8 +119,13 @@ jobs:
 
           echo "$DISPATCH_OUTPUT"
 
-          DOWNSTREAM_URL=$(printf '%s\n' "$DISPATCH_OUTPUT" | rg -o 'https://github\.com/[^[:space:]]+/actions/runs/[0-9]+' -N -m 1 || true)
-          DOWNSTREAM_RUN_ID=$(printf '%s\n' "$DOWNSTREAM_URL" | rg -o '[0-9]+$' -N -m 1 || true)
+          DOWNSTREAM_URL=$(printf '%s\n' "$DISPATCH_OUTPUT" | sed -n 's#.*\(https://github\.com/[^[:space:]]*/actions/runs/[0-9][0-9]*\).*#\1#p' | sed -n '1p')
+          DOWNSTREAM_RUN_ID=""
+          if [[ -n "$DOWNSTREAM_URL" ]]; then
+            DOWNSTREAM_RUN_ID="${DOWNSTREAM_URL##*/}"
+            echo "downstream_url=${DOWNSTREAM_URL}" >> "$GITHUB_OUTPUT"
+            echo "downstream_run_id=${DOWNSTREAM_RUN_ID}" >> "$GITHUB_OUTPUT"
+          fi
 
           echo "## Downstream Dispatches" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -131,10 +140,14 @@ jobs:
     needs: release
     if: github.ref == 'refs/heads/main' && needs.release.result == 'success'
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ 'downstream-frontend' }}
+      url: ${{ steps.dispatch_frontend.outputs.downstream_url }}
     permissions:
       contents: read
     steps:
       - name: Dispatch frontend workflow
+        id: dispatch_frontend
         env:
           GH_TOKEN: ${{ secrets.JETSCALEBOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
@@ -149,8 +162,13 @@ jobs:
 
           echo "$DISPATCH_OUTPUT"
 
-          DOWNSTREAM_URL=$(printf '%s\n' "$DISPATCH_OUTPUT" | rg -o 'https://github\.com/[^[:space:]]+/actions/runs/[0-9]+' -N -m 1 || true)
-          DOWNSTREAM_RUN_ID=$(printf '%s\n' "$DOWNSTREAM_URL" | rg -o '[0-9]+$' -N -m 1 || true)
+          DOWNSTREAM_URL=$(printf '%s\n' "$DISPATCH_OUTPUT" | sed -n 's#.*\(https://github\.com/[^[:space:]]*/actions/runs/[0-9][0-9]*\).*#\1#p' | sed -n '1p')
+          DOWNSTREAM_RUN_ID=""
+          if [[ -n "$DOWNSTREAM_URL" ]]; then
+            DOWNSTREAM_RUN_ID="${DOWNSTREAM_URL##*/}"
+            echo "downstream_url=${DOWNSTREAM_URL}" >> "$GITHUB_OUTPUT"
+            echo "downstream_run_id=${DOWNSTREAM_RUN_ID}" >> "$GITHUB_OUTPUT"
+          fi
 
           echo "## Downstream Dispatches" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
