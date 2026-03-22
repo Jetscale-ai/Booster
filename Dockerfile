@@ -71,8 +71,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg \
     && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
-# 2c. Devbox + Namespace CLI (nsc)
-ARG DEVBOX_VERSION=0.17.0
+# 2c. Namespace Devbox + Namespace CLI (nsc)
+ARG DEVBOX_VERSION=0.0.120
 ARG NSC_VERSION=0.0.490
 RUN set -eux; \
     case "$(dpkg --print-architecture)" in \
@@ -80,11 +80,11 @@ RUN set -eux; \
       arm64) ARCH=arm64 ;; \
       *) echo "Unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
     esac; \
-    curl -fsSL "https://github.com/jetify-com/devbox/releases/download/${DEVBOX_VERSION}/devbox_${DEVBOX_VERSION}_linux_${ARCH}.tar.gz" \
+    curl -fsSL "https://github.com/namespacelabs/devbox/releases/download/v${DEVBOX_VERSION}/devbox_${DEVBOX_VERSION}_linux_${ARCH}.tar.gz" \
       | tar -xz -C /usr/local/bin devbox; \
     curl -fsSL "https://github.com/namespacelabs/foundation/releases/download/v${NSC_VERSION}/nsc_${NSC_VERSION}_linux_${ARCH}.tar.gz" \
       | tar -xz -C /usr/local/bin nsc; \
-    devbox version; \
+    test -x /usr/local/bin/devbox; \
     nsc version
 
 # 3. Inherit Global NPM Tools + Install Python Toolchain
