@@ -72,6 +72,8 @@ gh run view <run-id> --repo Jetscale-ai/Booster --log-failed
 - Preferred remote builder setup: `namespacelabs/nscloud-setup-buildx-action@v0`
 - Opt JavaScript actions into Node 24 when possible:
   `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`
+- Booster container images currently ship Node.js `25.8.1` with npm `11.11.0`;
+  GitHub Actions runtime pinning is a separate concern.
 
 If a CI warning mentions Node 20, first check whether it comes from:
 

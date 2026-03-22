@@ -1,6 +1,8 @@
 # ==========================================
 # 0. Global Setup
 # ==========================================
+ARG NODE_VERSION=25.8.1
+
 # USES: JetScale Thruster (Ubuntu 24.04 + Base Tools)
 FROM ghcr.io/jetscale-ai/thruster-dev:latest AS dev-base
 
@@ -14,6 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # USES: JetScale Thruster (Alpine 3.21 + Hardened Runtime)
 # Inherits: tini, ca-certificates, tzdata, bash, curl
 FROM ghcr.io/jetscale-ai/thruster:latest AS runtime-base
+
+FROM node:${NODE_VERSION}-bookworm-slim AS node-linux
+
+# Official Node current release for Alpine-based runtime stages.
+FROM node:${NODE_VERSION}-alpine3.22 AS node-alpine
 
 # Test Assets (Source Code)
 FROM dev-base AS assets
@@ -32,10 +39,8 @@ RUN go install github.com/magefile/mage@latest
 
 # --- TS Base ---
 FROM dev-base AS base-dev-ts
-ARG NODE_VERSION=20
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g pnpm ts-node typescript \
+COPY --from=node-linux /usr/local/ /usr/local/
+RUN npm install -g pnpm ts-node typescript \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Py Base ---
@@ -57,9 +62,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 RUN echo 'export PATH="/usr/local/go/bin:${PATH}"' > /etc/profile.d/golang.sh
 
 # 2. Inherit Node.js (Native)
-ARG NODE_VERSION=20
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
-    && apt-get install -y nodejs
+COPY --from=node-linux /usr/local/ /usr/local/
 
 # 2b. GitHub CLI (gh)
 RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg \
@@ -88,10 +91,10 @@ RUN set -eux; \
     nsc version
 
 # 3. Inherit Global NPM Tools + Install Python Toolchain
-COPY --from=base-dev-ts /usr/lib/node_modules /usr/lib/node_modules
-RUN ln -sf /usr/lib/node_modules/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm \
-    && ln -sf /usr/lib/node_modules/typescript/bin/tsc /usr/local/bin/tsc \
-    && ln -sf /usr/lib/node_modules/ts-node/dist/bin.js /usr/local/bin/ts-node
+COPY --from=base-dev-ts /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf /usr/local/lib/node_modules/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm \
+    && ln -sf /usr/local/lib/node_modules/typescript/bin/tsc /usr/local/bin/tsc \
+    && ln -sf /usr/local/lib/node_modules/ts-node/dist/bin.js /usr/local/bin/ts-node
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv sudo \
     && rm -rf /var/lib/apt/lists/*
@@ -290,10 +293,16 @@ ENV BOOSTER_VERSION="${JETSCALE_VERSION}" \
 FROM runtime-base AS base-run-go
 RUN apk add --no-cache libc6-compat
 
-FROM runtime-base AS base-run-js
-RUN apk add --no-cache nodejs npm
+FROM runtime-base AS base-run-node
+COPY --from=node-alpine /usr/local/ /usr/local/
+RUN apk add --no-cache libgcc libstdc++ \
+    && ln -sf /usr/local/bin/node /usr/bin/node \
+    && ln -sf /usr/local/bin/npm /usr/bin/npm \
+    && ln -sf /usr/local/bin/npx /usr/bin/npx
 
-FROM runtime-base AS base-run-py
+FROM base-run-node AS base-run-js
+
+FROM base-run-node AS base-run-py
 ARG PLAYWRIGHT_VERSION=1.48.0
 ENV VIRTUAL_ENV=/opt/venv
 RUN apk add --no-cache \
@@ -303,8 +312,6 @@ RUN apk add --no-cache \
         git \
         curl \
         unzip \
-        nodejs \
-        npm \
         chromium \
         chromium-chromedriver \
         nss \
@@ -324,12 +331,12 @@ RUN apk add --no-cache \
     && if [ -f /tmp/playwright-driver/README.md ]; then cp /tmp/playwright-driver/README.md "${DRIVER_DIR}/README.md"; fi \
     && cp -R /tmp/playwright-driver/package "${DRIVER_DIR}/" \
     && rm -rf /tmp/playwright-driver /tmp/playwright-driver.zip \
-    && PLAYWRIGHT_NODEJS_PATH=/usr/bin/node "${VIRTUAL_ENV}/bin/playwright" install chromium
+    && PLAYWRIGHT_NODEJS_PATH=/usr/local/bin/node "${VIRTUAL_ENV}/bin/playwright" install chromium
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
-ENV PLAYWRIGHT_NODEJS_PATH=/usr/bin/node
+ENV PLAYWRIGHT_NODEJS_PATH=/usr/local/bin/node
 
-FROM runtime-base AS base-run-poly
-RUN apk add --no-cache libc6-compat nodejs npm python3 github-cli
+FROM base-run-node AS base-run-poly
+RUN apk add --no-cache libc6-compat python3 github-cli
 
 # RELEASE TARGETS
 # The RUN --mount instructions act as the verification step.

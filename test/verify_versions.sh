@@ -4,7 +4,8 @@ set -e
 # Expected Versions (Update these when bumping Dockerfile ARGs)
 EXPECTED_GO_MAJOR="1"
 EXPECTED_GO_MINOR="25"
-EXPECTED_NODE_MAJOR="20"
+EXPECTED_NODE_MAJOR="25"
+EXPECTED_NPM_MAJOR="11"
 EXPECTED_PYTHON_MAJOR="3"
 
 echo "Auditing toolchain versions..."
@@ -39,6 +40,21 @@ if command -v node >/dev/null 2>&1; then
   fi
 else
   echo "Node not found (skip)"
+fi
+
+# --- NPM CHECK ---
+if command -v npm >/dev/null 2>&1; then
+  NPM_FULL=$(npm --version) # e.g., 11.11.0
+  IFS='.' read -r NPM_MAJ NPM_MIN NPM_PAT <<< "$NPM_FULL"
+
+  if [[ "$NPM_MAJ" == "$EXPECTED_NPM_MAJOR" ]]; then
+    echo "npm: $NPM_FULL (matches ${EXPECTED_NPM_MAJOR})"
+  else
+    echo "npm: found $NPM_FULL, expected major ${EXPECTED_NPM_MAJOR}"
+    exit 1
+  fi
+else
+  echo "npm not found (skip)"
 fi
 
 # --- PYTHON CHECK ---

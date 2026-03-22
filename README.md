@@ -16,9 +16,10 @@ We publish two families of images to GHCR and Docker Hub:
 
 Based on **[JetScale Thruster Dev](https://github.com/Jetscale-ai/Thruster)**
 (Ubuntu 24.04). Includes build tools (`curl`, `git`, `make`, `jq`, `yq`,
-`build-essential`) and language toolchains (Go, Node, Python, `poetry`, `uv`),
-plus operator CLIs like `gh`, Namespace `devbox`, and `nsc`. Intended for: **CI
-Build Jobs**, **DevContainers**, **Local Development**.
+`build-essential`) and language toolchains (Go, Node.js 25.8.1 with npm 11.11.0,
+Python, `poetry`, `uv`), plus operator CLIs like `gh`, Namespace `devbox`, and
+`nsc`. Intended for: **CI Build Jobs**, **DevContainers**, **Local
+Development**.
 
 - `ghcr.io/jetscale-ai/booster-dev` (Polyglot)
 - `ghcr.io/jetscale-ai/booster-go-dev`
@@ -29,7 +30,8 @@ Build Jobs**, **DevContainers**, **Local Development**.
 
 Based on **[JetScale Thruster](https://github.com/Jetscale-ai/Thruster)**
 (Alpine 3.21). Minimal footprint, hardened. Intended for: **Production
-Containers**.
+Containers**. Runtime images ship the same Node.js 25.8.1 and npm 11.11.0
+toolchain for JavaScript workloads.
 
 - `ghcr.io/jetscale-ai/booster`
 - `ghcr.io/jetscale-ai/booster-go`
@@ -126,7 +128,9 @@ The pre-commit hooks include:
   - `backend-base/.github/workflows/release-backend-base.yml`
   - `frontend/.github/workflows/pipeline.yml`
 - The shared reusable workflow adopts Namespace checkout/buildx optimizations
-  and now uses `actions/setup-go@v6` to reduce Node 20 deprecation noise.
+  and keeps GitHub Actions JavaScript runtime pinning separate from the shipped
+  container toolchain. Booster images currently publish Node.js 25.8.1 with npm
+  11.11.0.
 
 ## Local Testing (act)
 
