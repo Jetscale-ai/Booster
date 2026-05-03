@@ -3,6 +3,8 @@
     "module": "commonjs",
     "target": "es2020",
     "strict": true,
-    "esModuleInterop": true
-  }
+    "esModuleInterop": true,
+    "outDir": "/tmp/artifacts"
+  },
+  "include": ["index.ts"]
 }
