@@ -156,14 +156,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh \
 # Pre-commit (Git hook framework)
 RUN python3 -m pip install --break-system-packages pre-commit
 
-# Pre-warm pre-commit hook environments for faster devcontainer startup.
-# Uses a comprehensive config covering all hooks used across JetScale repos.
-# Hooks matching these exact repo@rev combos get instant first-run.
-COPY .pre-commit-config.prewarm.yaml /tmp/.pre-commit-config.yaml
-RUN cd /tmp && git init -q && \
-    pre-commit install-hooks -c .pre-commit-config.yaml && \
-    rm -rf /tmp/.git /tmp/.pre-commit-config.yaml
-
 # Clean up
 RUN rm -rf /root/.cache /root/go /go/pkg/mod
 
@@ -300,6 +292,16 @@ RUN set -eux; \
       -o /home/ubuntu/.local/share/gh/extensions/gh-act/gh-act; \
     chmod 0755 /home/ubuntu/.local/share/gh/extensions/gh-act/gh-act; \
     chown -R ubuntu:ubuntu /home/ubuntu/.local
+
+# Pre-warm pre-commit hook environments for faster devcontainer startup.
+# Run as ubuntu user so cache lands in /home/ubuntu/.cache/pre-commit/
+COPY --chown=ubuntu:ubuntu .pre-commit-config.prewarm.yaml /home/ubuntu/.pre-commit-config.prewarm.yaml
+RUN su - ubuntu -c '\
+    cd /home/ubuntu && \
+    git init -q .pre-commit-warm && \
+    cd .pre-commit-warm && \
+    pre-commit install-hooks -c /home/ubuntu/.pre-commit-config.prewarm.yaml && \
+    cd .. && rm -rf .pre-commit-warm .pre-commit-config.prewarm.yaml'
 
 # Devcontainer health-check: verify every tool is reachable as the ubuntu user
 RUN --mount=from=assets,source=/test/verify_devcontainer.sh,target=/tmp/verify_devcontainer.sh \
