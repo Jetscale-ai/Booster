@@ -135,6 +135,43 @@ comprehensive set of hooks that get cached during image build:
 When the image is used as a devcontainer, these hooks run instantly on first
 commit instead of downloading and installing environments.
 
+### GPG Signing in Devcontainers
+
+The `booster-dev` image is pre-configured for GPG commit signing using loopback
+pinentry mode. To enable GPG signing in your devcontainer:
+
+**One-time host setup:**
+
+1. Add to your host's `~/.gnupg/gpg-agent.conf`:
+
+   ```
+   allow-loopback-pinentry
+   ```
+
+2. Reload the agent:
+
+   ```bash
+   gpgconf --reload gpg-agent
+   ```
+
+**Per-repo devcontainer.json:**
+
+Mount your GPG keys (not the entire `.gnupg` directory to avoid symlink issues):
+
+```json
+{
+  "mounts": [
+    "source=${localEnv:HOME}/.gnupg/private-keys-v1.d,target=/home/ubuntu/.gnupg/private-keys-v1.d,type=bind,readonly",
+    "source=${localEnv:HOME}/.gnupg/pubring.kbx,target=/home/ubuntu/.gnupg/pubring.kbx,type=bind,readonly",
+    "source=${localEnv:HOME}/.gnupg/trustdb.gpg,target=/home/ubuntu/.gnupg/trustdb.gpg,type=bind,readonly"
+  ],
+  "remoteUser": "ubuntu"
+}
+```
+
+The image provides the GPG configuration (`pinentry-mode loopback`), so you only
+need to mount your keys.
+
 ### Adding a new language
 
 1. Update `Dockerfile`:

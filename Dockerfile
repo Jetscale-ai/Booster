@@ -268,6 +268,25 @@ RUN usermod -aG sudo -s /bin/bash ubuntu \
     && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
 
+# GPG signing support for devcontainers (loopback pinentry mode)
+# This allows GPG to prompt for passphrase without a TTY, which is required
+# when running inside a container. Users must also add 'allow-loopback-pinentry'
+# to their HOST's ~/.gnupg/gpg-agent.conf and mount ~/.gnupg into the container.
+RUN mkdir -p /home/ubuntu/.gnupg && \
+    chmod 700 /home/ubuntu/.gnupg && \
+    echo "pinentry-mode loopback" > /home/ubuntu/.gnupg/gpg.conf && \
+    echo "allow-loopback-pinentry" > /home/ubuntu/.gnupg/gpg-agent.conf && \
+    chown -R ubuntu:ubuntu /home/ubuntu/.gnupg
+
+# SSH directory with correct permissions (users mount keys from host)
+RUN mkdir -p /home/ubuntu/.ssh && \
+    chmod 700 /home/ubuntu/.ssh && \
+    chown ubuntu:ubuntu /home/ubuntu/.ssh
+
+# Locale environment (prevents encoding issues in Python, Node.js, etc.)
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
 # gh-act: local GitHub Actions runner (user-scoped gh extension)
 ARG GH_ACT_VERSION=0.2.84
 RUN set -eux; \
