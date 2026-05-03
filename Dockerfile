@@ -190,7 +190,7 @@ RUN cd /tmp/test-ts && ts-node index.ts
 # B. Transpile to Standalone JS (For Runtime Check)
 #    This script relies solely on standard node libs.
 RUN mkdir -p /tmp/artifacts && \
-    cd /tmp/test-ts && tsc --outFile /tmp/artifacts/smoke-ts.js
+    cd /tmp/test-ts && tsc index.ts --outfile /tmp/artifacts/smoke-ts.js --ignoreConfig
 RUN touch /tmp/PASSED
 
 # --- Py Logic Check ---
