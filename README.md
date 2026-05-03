@@ -132,6 +132,9 @@ comprehensive set of hooks that get cached during image build:
 - `golangci-lint` v2.12.0 - Go linting
 - `pre-commit-golang` v1.0.0-rc.4 - Go formatting
 
+When the image is used as a devcontainer, these hooks run instantly on first
+commit instead of downloading and installing environments.
+
 ### Adding a new language
 
 1. Update `Dockerfile`:
