@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+host_gnupg="${JETSCALE_HOST_GNUPG:-/tmp/host-gnupg}"
+gnupg_home="${GNUPGHOME:-${HOME}/.gnupg}"
+workspace_dir="${JETSCALE_WORKSPACE:-${PWD}}"
+
+mkdir -p "${gnupg_home}/private-keys-v1.d"
+chmod 700 "${gnupg_home}" "${gnupg_home}/private-keys-v1.d"
+
+if [[ -d "${host_gnupg}/private-keys-v1.d" ]]; then
+    shopt -s nullglob
+    key_files=("${host_gnupg}/private-keys-v1.d"/*.key)
+    if (( ${#key_files[@]} > 0 )); then
+        cp -f "${key_files[@]}" "${gnupg_home}/private-keys-v1.d/"
+        chmod 600 "${gnupg_home}/private-keys-v1.d"/*.key
+    fi
+    shopt -u nullglob
+fi
+
+copy_gnupg_file() {
+    local filename="$1"
+    if [[ -f "${host_gnupg}/${filename}" ]]; then
+        cp -f "${host_gnupg}/${filename}" "${gnupg_home}/${filename}"
+        chmod 600 "${gnupg_home}/${filename}"
+    fi
+}
+
+copy_gnupg_file pubring.kbx
+copy_gnupg_file trustdb.gpg
+
+printf '%s\n' 'pinentry-mode loopback' > "${gnupg_home}/gpg.conf"
+printf '%s\n' 'allow-loopback-pinentry' > "${gnupg_home}/gpg-agent.conf"
+chmod 600 "${gnupg_home}/gpg.conf" "${gnupg_home}/gpg-agent.conf"
+
+if command -v git >/dev/null 2>&1; then
+    if ! git config --global --get-all safe.directory 2>/dev/null | grep -Fxq "${workspace_dir}"; then
+        git config --global --add safe.directory "${workspace_dir}" 2>/dev/null || true
+    fi
+fi
+
+if (( $# == 1 )) && [[ -f "$1" && ! -x "$1" ]]; then
+    bash "$1"
+elif (( $# > 0 )); then
+    "$@"
+fi

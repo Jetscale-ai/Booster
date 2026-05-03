@@ -260,10 +260,13 @@ RUN usermod -aG sudo -s /bin/bash ubuntu \
     && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
 
-# GPG signing support for devcontainers (loopback pinentry mode)
-# This allows GPG to prompt for passphrase without a TTY, which is required
-# when running inside a container. Users must also add 'allow-loopback-pinentry'
-# to their HOST's ~/.gnupg/gpg-agent.conf and mount ~/.gnupg into the container.
+# Shared devcontainer helpers for GPG signing and repository bootstrap.
+COPY scripts/devcontainer-init /usr/local/bin/devcontainer-init
+COPY scripts/jetscale-gpg-agent.sh /etc/profile.d/jetscale-gpg-agent.sh
+RUN chmod 0755 /usr/local/bin/devcontainer-init \
+    && chmod 0644 /etc/profile.d/jetscale-gpg-agent.sh
+
+# GPG signing support for devcontainers (loopback pinentry mode).
 RUN mkdir -p /home/ubuntu/.gnupg && \
     chmod 700 /home/ubuntu/.gnupg && \
     echo "pinentry-mode loopback" > /home/ubuntu/.gnupg/gpg.conf && \

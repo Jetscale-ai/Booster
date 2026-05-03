@@ -137,40 +137,34 @@ commit instead of downloading and installing environments.
 
 ### GPG Signing in Devcontainers
 
-The `booster-dev` image is pre-configured for GPG commit signing using loopback
-pinentry mode. To enable GPG signing in your devcontainer:
+The `booster-dev` image ships shared devcontainer GPG support:
 
-**One-time host setup:**
-
-1. Add to your host's `~/.gnupg/gpg-agent.conf`:
-
-   ```
-   allow-loopback-pinentry
-   ```
-
-2. Reload the agent:
-
-   ```bash
-   gpgconf --reload gpg-agent
-   ```
+- `devcontainer-init` copies GPG material from a readonly `/tmp/host-gnupg`
+  mount into the container user's `~/.gnupg`, writes loopback pinentry config,
+  marks the workspace as a Git safe directory, and optionally runs the repo
+  setup command passed as arguments.
+- `/etc/profile.d/jetscale-gpg-agent.sh` runs for login terminals, replaces
+  Cursor's restricted GPG proxy with a container-local `gpg-agent` that allows
+  loopback pinentry, and sets `GPG_TTY`.
 
 **Per-repo devcontainer.json:**
 
-Mount your GPG keys (not the entire `.gnupg` directory to avoid symlink issues):
+Mount your host GPG home readonly and call the shared init before repo-local
+setup:
 
 ```json
 {
   "mounts": [
-    "source=${localEnv:HOME}/.gnupg/private-keys-v1.d,target=/home/ubuntu/.gnupg/private-keys-v1.d,type=bind,readonly",
-    "source=${localEnv:HOME}/.gnupg/pubring.kbx,target=/home/ubuntu/.gnupg/pubring.kbx,type=bind,readonly",
-    "source=${localEnv:HOME}/.gnupg/trustdb.gpg,target=/home/ubuntu/.gnupg/trustdb.gpg,type=bind,readonly"
+    "source=${localEnv:HOME}/.gnupg,target=/tmp/host-gnupg,type=bind,readonly"
   ],
+  "postCreateCommand": "devcontainer-init .devcontainer/setup.sh",
   "remoteUser": "ubuntu"
 }
 ```
 
-The image provides the GPG configuration (`pinentry-mode loopback`), so you only
-need to mount your keys.
+Keep repo-local `.devcontainer/setup.sh` files focused on workspace bootstrap
+(submodules, package install, build, and help text). Do not copy GPG material
+into the workspace.
 
 ### Adding a new language
 
