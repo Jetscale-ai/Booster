@@ -118,7 +118,19 @@ The pre-commit hooks include:
 The `booster-dev` image pre-warms all pre-commit hook environments used across
 JetScale repos. This eliminates first-run latency when using the image as a
 devcontainer base. The `.pre-commit-config.prewarm.yaml` file defines the
-comprehensive set of hooks that get cached during image build.
+comprehensive set of hooks that get cached during image build:
+
+- `pre-commit-hooks` v6.0.0 - standard hygiene
+- `gitleaks` v8.30.1 - secrets detection
+- `markdownlint-cli2` v0.22.1 - markdown linting
+- `shellcheck-py` v0.11.0.1 - shell script linting
+- `ruff-pre-commit` v0.15.12 - Python linting/formatting
+- `codespell` v2.4.2 - spell checking
+- `hadolint-py` v2.14.0 - Dockerfile linting
+- `yamlfmt` v0.21.0 - YAML formatting
+- `actionlint` v1.7.12 - GitHub Actions linting
+- `golangci-lint` v2.12.0 - Go linting
+- `pre-commit-golang` v1.0.0-rc.4 - Go formatting
 
 ### Adding a new language
 
