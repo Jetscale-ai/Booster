@@ -3,7 +3,7 @@ repos:
   # Standard Hygiene Hooks
   # ------------------------------------------------------------------
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
@@ -14,28 +14,35 @@ repos:
       - id: check-added-large-files
 
   # ------------------------------------------------------------------
+  # Secrets Detection
+  # ------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # ------------------------------------------------------------------
   # Markdown Formatting (Prettier)
   # ------------------------------------------------------------------
-  # Use the 'mirrors-prettier' repo which matches upstream version tags
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
+  - repo: local
     hooks:
-      - id: prettier
+      - id: prettier-markdown
+        name: prettier (markdown)
+        entry: npx prettier@3.5.3 --write --prose-wrap=always
+        language: system
         types: [markdown]
-        # Wrap prose for better diffs
-        args: [--prose-wrap=always]
 
   # ------------------------------------------------------------------
   # Go Linting + Formatting
   # ------------------------------------------------------------------
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.63.4
+    rev: v2.12.0
     hooks:
       - id: golangci-lint
         args: [--fix]
 
   - repo: https://github.com/tekwizely/pre-commit-golang
-    rev: v1.0.0-rc.1
+    rev: v1.0.0-rc.4
     hooks:
       # Format Go code
       - id: go-fmt

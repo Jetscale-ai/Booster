@@ -107,10 +107,18 @@ The pre-commit hooks include:
 
 - **Standard Hygiene**: Trailing whitespace, end-of-file fixes, merge conflict
   checks, YAML validation
+- **Secrets Detection**: `gitleaks` scans for accidentally committed secrets
 - **Markdown Formatting**: Prettier with prose wrapping for better diffs
 - **Go Linting**: `golangci-lint` with auto-fix enabled
 - **Go Formatting**: `gofmt` and `go mod tidy`
 - **Unit Tests**: Runs `go test` before commit
+
+### Pre-warming in Dev Images
+
+The `booster-dev` image pre-warms all pre-commit hook environments used across
+JetScale repos. This eliminates first-run latency when using the image as a
+devcontainer base. The `.pre-commit-config.prewarm.yaml` file defines the
+comprehensive set of hooks that get cached during image build.
 
 ### Adding a new language
 

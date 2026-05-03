@@ -1,0 +1,99 @@
+# Pre-commit hooks pre-warming configuration for booster-dev image.
+# This config includes all hooks used across JetScale repos to maximize cache hits.
+# DO NOT use this file directly - it's only for Docker image pre-warming.
+
+repos:
+  # ------------------------------------------------------------------
+  # Standard Hygiene Hooks (used by ALL repos)
+  # ------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+      - id: detect-private-key
+      - id: mixed-line-ending
+
+  # ------------------------------------------------------------------
+  # Secrets Detection (used by ALL repos)
+  # ------------------------------------------------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # ------------------------------------------------------------------
+  # Markdown Linting (used by 8 repos)
+  # ------------------------------------------------------------------
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.22.1
+    hooks:
+      - id: markdownlint-cli2
+
+  # ------------------------------------------------------------------
+  # Shell Script Linting (used by 7 repos)
+  # ------------------------------------------------------------------
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  # ------------------------------------------------------------------
+  # Python Linting + Formatting (used by 4 repos)
+  # ------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff
+      - id: ruff-format
+
+  # ------------------------------------------------------------------
+  # Spell Checking (used by 3 repos)
+  # ------------------------------------------------------------------
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.2
+    hooks:
+      - id: codespell
+
+  # ------------------------------------------------------------------
+  # Dockerfile Linting (used by 3 repos)
+  # ------------------------------------------------------------------
+  - repo: https://github.com/AleksaC/hadolint-py
+    rev: v2.14.0
+    hooks:
+      - id: hadolint
+
+  # ------------------------------------------------------------------
+  # YAML Formatting (used by 2 repos)
+  # ------------------------------------------------------------------
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.21.0
+    hooks:
+      - id: yamlfmt
+
+  # ------------------------------------------------------------------
+  # GitHub Actions Linting (used by 1 repo)
+  # ------------------------------------------------------------------
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  # ------------------------------------------------------------------
+  # Go Linting (used by 3 repos)
+  # Note: golangci-lint downloads its own binary, pre-warming helps
+  # ------------------------------------------------------------------
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.12.0
+    hooks:
+      - id: golangci-lint
+
+  - repo: https://github.com/tekwizely/pre-commit-golang
+    rev: v1.0.0-rc.4
+    hooks:
+      - id: go-fmt
+      - id: go-mod-tidy

@@ -156,6 +156,14 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh \
 # Pre-commit (Git hook framework)
 RUN python3 -m pip install --break-system-packages pre-commit
 
+# Pre-warm pre-commit hook environments for faster devcontainer startup.
+# Uses a comprehensive config covering all hooks used across JetScale repos.
+# Hooks matching these exact repo@rev combos get instant first-run.
+COPY .pre-commit-config.prewarm.yaml /tmp/.pre-commit-config.yaml
+RUN cd /tmp && git init -q && \
+    pre-commit install-hooks -c .pre-commit-config.yaml && \
+    rm -rf /tmp/.git /tmp/.pre-commit-config.yaml
+
 # Clean up
 RUN rm -rf /root/.cache /root/go /go/pkg/mod
 

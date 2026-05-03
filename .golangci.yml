@@ -1,18 +1,16 @@
+version: "2"
+
 run:
-  timeout: 5m
   tests: true
   modules-download-mode: readonly
 
 linters:
   enable:
     - errcheck      # Check for unchecked errors
-    - gosimple      # Simplify code
     - govet         # Go vet examines Go source code
     - ineffassign   # Detect ineffectual assignments
-    - staticcheck   # Advanced Go linter
+    - staticcheck   # Advanced Go linter (includes gosimple)
     - unused        # Check for unused code
-    - gofmt         # Check formatting
-    - goimports     # Check imports
     - misspell      # Check for misspelled words
     - revive        # Fast, configurable, extensible linter
     - gosec         # Security-focused linter
@@ -20,19 +18,23 @@ linters:
     - goconst       # Find repeated strings that could be constants
     - gocyclo       # Check cyclomatic complexity
     - dupl          # Check for duplicate code
+  settings:
+    errcheck:
+      check-blank: true
+    gocyclo:
+      min-complexity: 15
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    misspell:
+      locale: US
 
-linters-settings:
-  errcheck:
-    check-blank: true
-  gocyclo:
-    min-complexity: 15
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-  misspell:
-    locale: US
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 issues:
-  exclude-use-default: false
+  exclude-generated: lax
   max-issues-per-linter: 0
   max-same-issues: 0
