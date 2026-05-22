@@ -33,14 +33,7 @@ COPY test /test
 # --- Go Base ---
 FROM dev-base AS base-dev-go
 ARG GO_VERSION=1.26.3
-ARG TARGETARCH
-RUN set -eux; \
-    case "${TARGETARCH}" in \
-      amd64) GO_ARCH=amd64 ;; \
-      arm64) GO_ARCH=arm64 ;; \
-      *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac; \
-    curl -L "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz
+RUN curl -fL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz
 ENV PATH="/usr/local/go/bin:/root/go/bin:${PATH}"
 RUN go install github.com/magefile/mage@latest
 
