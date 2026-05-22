@@ -53,7 +53,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV PATH="/root/.local/bin:${PATH}"
 
 # --- Polyglot Base ---
-FROM dev-base AS base-dev-poly
+FROM base-dev-ts AS base-dev-poly
 
 # 1. Inherit Go Toolchain; place user-built binaries (Mage) in /usr/local/bin
 COPY --from=base-dev-go /usr/local/go /usr/local/go
@@ -61,10 +61,7 @@ COPY --from=base-dev-go /root/go/bin/mage /usr/local/bin/mage
 ENV PATH="/usr/local/go/bin:${PATH}"
 RUN echo 'export PATH="/usr/local/go/bin:${PATH}"' > /etc/profile.d/golang.sh
 
-# 2. Inherit Node.js (Native)
-COPY --from=node-linux /usr/local/ /usr/local/
-
-# 2b. GitHub CLI (gh)
+# 2. GitHub CLI (gh)
 RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
@@ -90,11 +87,7 @@ RUN set -eux; \
     test -x /usr/local/bin/devbox; \
     nsc version
 
-# 3. Inherit Global NPM Tools + Install Python Toolchain
-COPY --from=base-dev-ts /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN ln -sf /usr/local/lib/node_modules/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm \
-    && ln -sf /usr/local/lib/node_modules/typescript/bin/tsc /usr/local/bin/tsc \
-    && ln -sf /usr/local/lib/node_modules/ts-node/dist/bin.js /usr/local/bin/ts-node
+# 3. Install Python Toolchain
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv sudo \
     && rm -rf /var/lib/apt/lists/*
