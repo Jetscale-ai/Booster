@@ -1,4 +1,4 @@
-# JetScale Booster Constitution
+# Jetscale Booster Constitution
 
 <!-- markdownlint-disable MD013 -->
 

@@ -3,7 +3,7 @@ set -e
 
 # Expected Versions (Update these when bumping Dockerfile ARGs)
 EXPECTED_GO_MAJOR="1"
-EXPECTED_GO_MINOR="25"
+EXPECTED_GO_MINOR="26"
 EXPECTED_NODE_MAJOR="25"
 EXPECTED_NPM_MAJOR="11"
 EXPECTED_PYTHON_MAJOR="3"
@@ -12,7 +12,7 @@ echo "Auditing toolchain versions..."
 
 # --- GO CHECK ---
 if command -v go >/dev/null 2>&1; then
-  GO_FULL=$(go version | awk '{print $3}') # e.g., go1.25.4
+  GO_FULL=$(go version | awk '{print $3}') # e.g., go1.26.3
   GO_VER=${GO_FULL#go}
   IFS='.' read -r G_MAJ G_MIN G_PAT <<< "$GO_VER"
 

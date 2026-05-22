@@ -1,5 +1,5 @@
 module github.com/jetscale/booster
 
-go 1.25
+go 1.26
 
 require github.com/magefile/mage v1.15.0
