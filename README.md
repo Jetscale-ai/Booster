@@ -1,6 +1,6 @@
 # Booster
 
-**Booster** is the heavy-lift infrastructure for JetScale's CI/CD pipeline. It
+**Booster** is the heavy-lift infrastructure for Jetscale's CI/CD pipeline. It
 provides:
 
 1. **Unified Base Images**: Polyglot Docker images for Go, TypeScript, and
@@ -14,9 +14,9 @@ We publish two families of images to GHCR and Docker Hub:
 
 ### 1. Dev Images (`-dev`)
 
-Based on **[JetScale Thruster Dev](https://github.com/Jetscale-ai/Thruster)**
+Based on **[Jetscale Thruster Dev](https://github.com/Jetscale-ai/Thruster)**
 (Ubuntu 24.04). Includes build tools (`curl`, `git`, `make`, `jq`, `yq`,
-`build-essential`) and language toolchains (Go, Node.js 25.8.1 with npm 11.11.0,
+`build-essential`) and language toolchains (Go 1.26.3, Node.js 25.8.1 with npm 11.11.0,
 Python, `poetry`, `uv`), plus operator CLIs like `gh`, Namespace `devbox`, and
 `nsc`. Intended for: **CI Build Jobs**, **DevContainers**, **Local
 Development**.
@@ -28,8 +28,8 @@ Development**.
 
 ### 2. Runtime Images (no suffix)
 
-Based on **[JetScale Thruster](https://github.com/Jetscale-ai/Thruster)**
-(Alpine 3.21). Minimal footprint, hardened. Intended for: **Production
+Based on **[Jetscale Thruster](https://github.com/Jetscale-ai/Thruster)**
+(Alpine 3.22). Minimal footprint, hardened. Intended for: **Production
 Containers**. Runtime images ship the same Node.js 25.8.1 and npm 11.11.0
 toolchain for JavaScript workloads.
 

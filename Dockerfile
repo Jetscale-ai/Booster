@@ -3,7 +3,7 @@
 # ==========================================
 ARG NODE_VERSION=25.8.1
 
-# USES: JetScale Thruster (Ubuntu 24.04 + Base Tools)
+# USES: Jetscale Thruster (Ubuntu 24.04 + Base Tools)
 FROM ghcr.io/jetscale-ai/thruster-dev:latest AS dev-base
 
 # Add build-essential (GCC/G++) and Starship (available to all users via /etc/profile.d)
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -sS https://starship.rs/install.sh | sh -s -- -y \
     && echo 'eval "$(starship init bash)"' >> /etc/profile.d/starship.sh
 
-# USES: JetScale Thruster (Alpine 3.21 + Hardened Runtime)
+# USES: Jetscale Thruster (Alpine 3.22 + Hardened Runtime)
 # Inherits: tini, ca-certificates, tzdata, bash, curl
 FROM ghcr.io/jetscale-ai/thruster:latest AS runtime-base
 
@@ -32,8 +32,15 @@ COPY test /test
 
 # --- Go Base ---
 FROM dev-base AS base-dev-go
-ARG GO_VERSION=1.25.4
-RUN curl -L "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/local -xz
+ARG GO_VERSION=1.26.3
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) GO_ARCH=amd64 ;; \
+      arm64) GO_ARCH=arm64 ;; \
+      *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -L "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz
 ENV PATH="/usr/local/go/bin:/root/go/bin:${PATH}"
 RUN go install github.com/magefile/mage@latest
 
