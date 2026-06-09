@@ -108,7 +108,7 @@ RUN go install sigs.k8s.io/kind@latest \
     && mv /root/go/bin/kind /usr/local/bin/kind
 
 # Helm (via Script)
-RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
+RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 && \
     chmod 700 get_helm.sh && \
     ./get_helm.sh && \
     rm get_helm.sh
