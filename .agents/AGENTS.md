@@ -72,8 +72,10 @@ gh run view <run-id> --repo Jetscale-ai/Booster --log-failed
 - Preferred remote builder setup: `namespacelabs/nscloud-setup-buildx-action@v0`
 - Opt JavaScript actions into Node 24 when possible:
   `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`
-- Booster container images currently ship Node.js `25.8.1` with npm `11.11.0`;
-  GitHub Actions runtime pinning is a separate concern.
+- Booster container images ship Node.js `24.22.1` (LTS) with npm `11.19.1`.
+  `node:24.22.1` has no `alpine3.22` tag, so the musl build is copied from
+  `node:24.22.1-alpine3.23` onto Thruster's Alpine 3.22 runtime. GitHub Actions
+  runtime pinning is a separate concern.
 
 If a CI warning mentions Node 20, first check whether it comes from:
 
