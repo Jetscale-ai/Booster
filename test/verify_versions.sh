@@ -4,7 +4,10 @@ set -e
 # Expected Versions (Update these when bumping Dockerfile ARGs)
 EXPECTED_GO_MAJOR="1"
 EXPECTED_GO_MINOR="26"
-EXPECTED_NODE_MAJOR="25"
+# Node 24.22.1 or later on the 24 LTS line (CVE-2026-111497). Node 25 has no fix.
+EXPECTED_NODE_MAJOR="24"
+EXPECTED_NODE_MINOR="22"
+EXPECTED_NODE_PATCH="1"
 EXPECTED_NPM_MAJOR="11"
 EXPECTED_PYTHON_MAJOR="3"
 
@@ -28,14 +31,16 @@ fi
 
 # --- NODE CHECK ---
 if command -v node >/dev/null 2>&1; then
-  NODE_FULL=$(node --version) # e.g., v20.10.0
+  NODE_FULL=$(node --version) # e.g., v24.22.1
   NODE_VER=${NODE_FULL#v}
   IFS='.' read -r N_MAJ N_MIN N_PAT <<< "$NODE_VER"
 
-  if [[ "$N_MAJ" == "$EXPECTED_NODE_MAJOR" ]]; then
-    echo "Node: $NODE_VER (matches ${EXPECTED_NODE_MAJOR})"
+  if [[ "$N_MAJ" == "$EXPECTED_NODE_MAJOR" ]] && \
+    (( 10#$N_MIN > 10#$EXPECTED_NODE_MINOR || \
+      (10#$N_MIN == 10#$EXPECTED_NODE_MINOR && 10#$N_PAT >= 10#$EXPECTED_NODE_PATCH) )); then
+    echo "Node: $NODE_VER (>= ${EXPECTED_NODE_MAJOR}.${EXPECTED_NODE_MINOR}.${EXPECTED_NODE_PATCH})"
   else
-    echo "Node: found $NODE_VER, expected major ${EXPECTED_NODE_MAJOR}"
+    echo "Node: found $NODE_VER, expected ${EXPECTED_NODE_MAJOR} >= ${EXPECTED_NODE_MAJOR}.${EXPECTED_NODE_MINOR}.${EXPECTED_NODE_PATCH}"
     exit 1
   fi
 else
@@ -44,7 +49,7 @@ fi
 
 # --- NPM CHECK ---
 if command -v npm >/dev/null 2>&1; then
-  NPM_FULL=$(npm --version) # e.g., 11.11.0
+  NPM_FULL=$(npm --version) # e.g., 11.19.1
   IFS='.' read -r NPM_MAJ NPM_MIN NPM_PAT <<< "$NPM_FULL"
 
   if [[ "$NPM_MAJ" == "$EXPECTED_NPM_MAJOR" ]]; then

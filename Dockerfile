@@ -1,7 +1,8 @@
 # ==========================================
 # 0. Global Setup
 # ==========================================
-ARG NODE_VERSION=25.8.1
+# Node.js 24 LTS (Krypton). Node 25 is end of life and has no CVE-2026-111497 fix.
+ARG NODE_VERSION=24.22.1
 
 # USES: Jetscale Thruster (Ubuntu 24.04 + Base Tools)
 FROM ghcr.io/jetscale-ai/thruster-dev:latest AS dev-base
@@ -16,11 +17,41 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # USES: Jetscale Thruster (Alpine 3.22 + Hardened Runtime)
 # Inherits: tini, ca-certificates, tzdata, bash, curl
 FROM ghcr.io/jetscale-ai/thruster:latest AS runtime-base
+# System libbrotli for curl and other apk consumers. CVE-2026-111497.
+RUN set -eux; \
+    apk add --no-cache --upgrade brotli-libs; \
+    ver="$(awk '$0=="P:brotli-libs"{f=1} f && /^V:/{print substr($0,3); exit}' /lib/apk/db/installed)"; \
+    test -n "${ver}"; \
+    cmp="$(apk version -t "${ver}" "1.1.1-r0")"; \
+    case "${cmp}" in \
+      '='|'>') echo "brotli-libs ${ver} satisfies >= 1.1.1-r0" ;; \
+      *) echo "brotli-libs ${ver} is older than 1.1.1-r0" >&2; exit 1 ;; \
+    esac
 
+# Official Node.js 24 LTS glibc build. Dev images copy /usr/local from here.
+# Bookworm libbrotli1 security update: DLA-4855-1 (CVE-2026-111497).
 FROM node:${NODE_VERSION}-bookworm-slim AS node-linux
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends libbrotli1; \
+    ver="$(dpkg-query -W -f '${Version}' libbrotli1)"; \
+    dpkg --compare-versions "${ver}" ge "1.0.9-2+deb12u1"; \
+    echo "libbrotli1 ${ver} satisfies >= 1.0.9-2+deb12u1"; \
+    rm -rf /var/lib/apt/lists/*
 
-# Official Node current release for Alpine-based runtime stages.
-FROM node:${NODE_VERSION}-alpine3.22 AS node-alpine
+# 24.22.1 dropped the alpine3.22 tag (oldest published variant is 3.23).
+# Only /usr/local is copied onto Thruster's Alpine 3.22 runtime. The official
+# musl build bundles Brotli and links libstdc++/libgcc, installed below.
+FROM node:${NODE_VERSION}-alpine3.23 AS node-alpine
+RUN set -eux; \
+    apk add --no-cache --upgrade brotli-libs; \
+    ver="$(awk '$0=="P:brotli-libs"{f=1} f && /^V:/{print substr($0,3); exit}' /lib/apk/db/installed)"; \
+    test -n "${ver}"; \
+    cmp="$(apk version -t "${ver}" "1.1.1-r0")"; \
+    case "${cmp}" in \
+      '='|'>') echo "brotli-libs ${ver} satisfies >= 1.1.1-r0" ;; \
+      *) echo "brotli-libs ${ver} is older than 1.1.1-r0" >&2; exit 1 ;; \
+    esac
 
 # Test Assets (Source Code)
 FROM dev-base AS assets
@@ -40,7 +71,8 @@ RUN go install github.com/magefile/mage@latest
 # --- TS Base ---
 FROM dev-base AS base-dev-ts
 COPY --from=node-linux /usr/local/ /usr/local/
-RUN npm install -g pnpm ts-node typescript \
+# ts-node 10.9.2 reads typescript.sys, which TypeScript 7 removed.
+RUN npm install -g pnpm ts-node typescript@6 \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Py Base ---
